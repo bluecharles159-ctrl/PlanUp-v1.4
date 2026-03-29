@@ -250,9 +250,7 @@ function initializeCardExpansion() {
 initializeCardExpansion();
 
 // ===== ADD ITEM MODAL =====
-/*const addItemModal = document.getElementById('addItemModal');
-const closeAddItemModal = document.getElementById(
-  'closeAddItemModal');
+/*const addItemModal = document.getElementById('addItemModal')
 const cancelBtn = document.getElementById('cancelBtn');
 const saveItemBtn = document.getElementById('saveItemBtn');
 const addItemBtn = document.getElementById('addItemBtn');
@@ -274,7 +272,6 @@ function closeModal() {
   addItemModal.classList.remove('show');
 }
 
-closeAddItemModal.addEventListener('click', closeModal);
 cancelBtn.addEventListener('click', closeModal);
 
 addItemModal.addEventListener('click', (e) => {
@@ -1717,7 +1714,6 @@ overlay.addEventListener("click", () => {
 
 // ===== ADD ITEM MODAL =====
 /*const addItemModal = document.getElementById('addItemModal');
-const closeAddItemModal = document.getElementById('closeAddItemModal');
 const cancelBtn = document.getElementById('cancelBtn');
 const saveItemBtn = document.getElementById('saveItemBtn');
 const addItemBtn = document.getElementById('addItemBtn');
@@ -1734,7 +1730,6 @@ function closeModal() {
   addItemModal.classList.remove('show');
 }
 
-if (closeAddItemModal) closeAddItemModal.addEventListener('click', closeModal);
 if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
 if (addItemBtn) addItemBtn.addEventListener('click', openAddItemModal);
 
