@@ -12,7 +12,7 @@ body {
 
 .home-page {
   width: 100vw;
-  position: relative;
+  position: fixed;
   overflow-y: auto;
   left: 0;
   top: 0;
@@ -1132,6 +1132,10 @@ body {
   opacity: 0;
 }
 
+.fab:hover {
+  cursor: pointer;
+}
+
 .fab:active::after {
   transform: scale(10);
   opacity: 1;
@@ -1174,8 +1178,8 @@ body {
 
 /* FAB ITEMS DEFAULT STATE */
 .fab-item {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height:32px;
   border-radius: 50%;
   background: #F4F4F4;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
@@ -1186,6 +1190,7 @@ body {
   transform: translateY(60px) scale(0.6);
   opacity: 0;
   transition: transform 0.3s ease, opacity 0.3s ease;
+  cursor: pointer;
 }
 
 .fab-item:active {
