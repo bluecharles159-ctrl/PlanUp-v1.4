@@ -300,6 +300,14 @@ increaseQty.addEventListener('click', () => {
   }
 })
 
+const customCategory = document.getElementById('customCategory');
+const addCategoryInput = document.getElementById('addCategoryInput');
+
+customCategory.addEventListener('click', () => {
+  addCategoryInput.classList.toggle('show');
+})
+
+
 let itemsArr = [];
 
 function saveItem() {
