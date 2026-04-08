@@ -354,8 +354,7 @@ if (accountToggle && accWrapper) {
 if (dataManagementToggle) {
   dataManagementToggle.addEventListener("click", () => {
     dataManagementToggle.classList.toggle("expanded");
-document.getElementById("dataManagementCard").classList.toggle("expanded");
-
+    document.getElementById("dataManagementCard").classList.toggle("expanded");
   });
 }
 
