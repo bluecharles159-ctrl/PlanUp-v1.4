@@ -223,7 +223,7 @@ body {
   padding-bottom: 0;
   border: 1px solid #D1E2D0;
   border-radius: 30px;
-  background: #F4FFF5;
+  background: #f4fff5;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   overflow: hidden;
   /* ✅ Prevent horizontal overflow */
@@ -551,6 +551,7 @@ body {
 
 .filter-chip {
   padding: 8px 12px;
+  min-height: min-content;
   border-radius: 20px;
   background: #f0f0f0;
   border: none;
@@ -599,6 +600,7 @@ body {
   color: #1B1B1B;
   font-size: 10px;
   font-weight: 200;
+  cursor: pointer;
 }
 
 .sort-btn:active {
@@ -655,15 +657,12 @@ body {
   background: linear-gradient(to right, #000000 50%, rgba(0, 0, 0, 1) 50%);
   color: #FFFFFF;
   border-radius: 3px;
+  cursor: pointer;
 }
 
 .sort-header svg {
   background: none;
 }
-
-/*.sort-header svg:hover {
-  background: ;
-}*/
 
 .sort-indicator {
   height: 16px;
@@ -676,6 +675,7 @@ body {
   left: 0;
   transform: translateX(0);
   transition: transform .05s linear;
+  cursor: pointer;
 }
 
 .sort-indicator.accend {
@@ -690,6 +690,7 @@ body {
   color: #000000;
   font-size: 14px;
   transition: .1s ease;
+  cursor: pointer;
 }
 
 .sort-pty.active {
@@ -763,12 +764,13 @@ body {
 }
 
 .item-card:hover {
-  transform: scaleY(1.03);
+  transform: scale(1.03);
   box-shadow: 2px 2px 4px rgba(0, 0, 0, .3);
 }
 
 .item-card.expanded {
   height: auto;
+  transform: scale(1);
 }
 
 .item-card.deleted {
@@ -1065,13 +1067,13 @@ body {
 }
 
 .fab-camera:active {
-  transform: translateX(-12px) scale(0.95);
+  /* transform: translateX(-12px) scale(0.95); */
   background: #FFFFFF;
   color: #000;
 }
 
 .fab-camera:hover {
-  transform: translateX(-12px) scale(0.95);
+  transform: translateX(-22px) scale(0.95);
   background: #FFFFFF;
   color: #000;
 }
@@ -1105,8 +1107,8 @@ body {
 
 /* MAIN FAB BUTTON */
 .fab {
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   background: linear-gradient(#FBFBFB, #DFDFDF);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
@@ -1230,6 +1232,7 @@ body {
 .fab.hide {
   pointer-events: none;
   transform: translateX(-1000%);
+  opacity: 0;
 }
 
 .modal-overlay {
@@ -1374,7 +1377,7 @@ body {
   visibility: hidden;
   opacity: 0;
   transform: scaleY(0);
-  transition: transform .6s ease;
+  transition: all .2s ease;
 }
 
 .add-category-input.show {
