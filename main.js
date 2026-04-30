@@ -185,6 +185,7 @@ document.getElementById("navInsights").onclick = () => {
   sortOverlay.classList.remove("show");
 
   closeModal();
+  renderInsightsChart();
 };
 
 if (periodBtn && periodWrapper) {
@@ -261,10 +262,6 @@ function openRangeModal() {
     rangeModal.appendChild(div);
   });
 
-  /*const rect = rangeText.getBoundingClientRect();
-  rangeModal.style.top = rect.bottom + window.scrollY + 6 + "px";
-  rangeModal.style.left = rect.left + window.scrollX + "px";*/
-
   rangeModal.classList.add("open");
 }
 
@@ -298,17 +295,134 @@ function capitalize(str) {
 
 updatePeriodMenu();
 
-breakdownByPriceBtn.addEventListener("click", () => {
-  breakdownByPriceBtn.classList.add("expanded");
-  breakdownOverlay.classList.add("show");
+let currentBreakdownOption =
+  breakdownByPriceBtn.querySelector("span")?.textContent.trim() ||
+  "By total budget";
+
+function setBreakdownOption(option) {
+  currentBreakdownOption = option;
+  const label = breakdownByPriceBtn.querySelector("span");
+  if (label) label.textContent = option;
+
+  breakdownByPriceBtn.querySelectorAll("button").forEach((button) => {
+    button.classList.toggle("active", button.textContent.trim() === option);
+  });
+
+  breakdownOverlay.classList.remove("show");
+  breakdownByPriceBtn.classList.remove("expanded");
+}
+
+breakdownByPriceBtn.addEventListener("click", (event) => {
+  if (event.target.tagName === "BUTTON") return;
+  breakdownByPriceBtn.classList.toggle("expanded");
+  breakdownOverlay.classList.toggle("show");
 });
+
+breakdownByPriceBtn.querySelectorAll("button").forEach((button) => {
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    setBreakdownOption(event.currentTarget.textContent.trim());
+  });
+});
+
 breakdownOverlay.addEventListener("click", () => {
   breakdownByPriceBtn.classList.remove("expanded");
   breakdownOverlay.classList.remove("show");
 });
 
-let currentOption = "By used budget" ? "By used budget" : "By total budget";
-let priceOption = ["By used budget", "By total budget"];
+setBreakdownOption(currentBreakdownOption);
+
+function getInsightsChartData() {
+  const aggregated = items.reduce((acc, item) => {
+    const name = item.name.trim();
+    if (!name) return acc;
+    const key = name.toLowerCase();
+    if (!acc[key]) {
+      acc[key] = {
+        name,
+        quantity: 0,
+        expense: 0,
+        uses: 0,
+      };
+    }
+    acc[key].quantity += item.quantity || 0;
+    acc[key].expense += item.price || 0;
+    acc[key].uses += 1;
+    return acc;
+  }, {});
+
+  return Object.values(aggregated)
+    .sort((a, b) => {
+      if (b.quantity !== a.quantity) return b.quantity - a.quantity;
+      if (b.expense !== a.expense) return b.expense - a.expense;
+      return b.uses - a.uses;
+    })
+    .slice(0, 5);
+}
+
+function renderInsightsChart() {
+  const canvas = document.getElementById("myChart");
+  if (!canvas) return;
+
+  const ctx = canvas.getContext("2d");
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const width = Math.max(320, rect.width || 320);
+  const height = Math.max(240, rect.height || 240);
+
+  canvas.width = width * dpr;
+  canvas.height = height * dpr;
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+
+  const chartData = getInsightsChartData();
+  if (!chartData.length) {
+    ctx.fillStyle = "#444";
+    ctx.font = "16px Inter, sans-serif";
+    ctx.fillText("Add items to see ranking chart", 14, 34);
+    return;
+  }
+
+  const padding = 18;
+  const labelWidth = 130;
+  const rowHeight = (height - padding * 2) / chartData.length;
+  const maxQuantity = Math.max(...chartData.map((item) => item.quantity), 1);
+  const barAreaWidth = width - padding * 2 - labelWidth - 20;
+
+  chartData.forEach((item, index) => {
+    const y = padding + index * rowHeight;
+    const barWidth = Math.max(8, (item.quantity / maxQuantity) * barAreaWidth);
+
+    ctx.fillStyle = "#248700";
+    ctx.fillRect(padding + labelWidth, y + 8, barWidth, rowHeight * 0.4);
+
+    ctx.fillStyle = "#111";
+    ctx.font = "600 13px Inter, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText(`${index + 1}. ${item.name}`, padding, y + 16);
+
+    ctx.font = "12px Inter, sans-serif";
+    ctx.fillStyle = "#555";
+    ctx.fillText(
+      `Qty ${item.quantity} · $${item.expense.toFixed(2)} · Uses ${item.uses}`,
+      padding,
+      y + 34,
+    );
+  });
+
+  ctx.fillStyle = "#777";
+  ctx.font = "600 12px Inter, sans-serif";
+  ctx.fillText(
+    "Top 5 ranked items by quantity, expense, and usage",
+    padding,
+    height - 10,
+  );
+}
+
+// let currentOption = "By used budget" ? "By used budget" : "By total budget";
+// let priceOption = ["By used budget", "By total budget"];
 
 //Profile Page
 document.getElementById("navProfiles").onclick = () => {
@@ -388,6 +502,11 @@ settingsIcon.addEventListener("click", () => {
   settingsPage.classList.add("show");
 });
 
+settingsBtn.addEventListener("click", () => {
+  settingsPage.classList.add("show");
+  closeMenu();
+});
+
 // ===== MENU =====
 menuBtn.addEventListener("click", () => {
   menuPage.classList.add("show");
@@ -401,7 +520,11 @@ menuOverlay.addEventListener("click", () => {
 
 // ===== NOTIFICATIONS =====
 notificationBtn.addEventListener("click", () => {
-  notificationPage.classList.add("show");
+  showNotificationPage();
+});
+
+notificationBar?.addEventListener("click", () => {
+  showNotificationPage();
 });
 
 // ===== BACK BUTTONS =====
@@ -979,7 +1102,7 @@ function getItemInfoStates(itemName, category) {
       type: "warning",
       summary: "Low stock detected",
       followUp: "◬ Reorder before it runs out",
-      full: `This ${itemName} may be low on availability soon. Add it to your next shopping list before the price changes or stock drops.`,
+      full: `This ${itemName} may be low on availability soon. Add it to your next To-Get list before the price changes or stock drops.`,
     },
     {
       type: "recommendation",
@@ -1481,19 +1604,20 @@ function updateFilterSortVisibility(hasVisibleCategories = true) {
 // ===== SAVE ITEM - FIXED FOR YOUR STRUCTURE =====
 if (saveItemBtn) {
   saveItemBtn.addEventListener("click", () => {
+    saveItemBtn.disabled = true;
     try {
-      const itemName = document.getElementById("itemNameInput").value.trim();
-      const quantity =
-        parseInt(document.getElementById("quantityInput").value) || 1;
-      const price = parseFloat(document.getElementById("priceInput").value);
+      const itemNameInput = document.getElementById("itemNameInput");
+      const quantityInput = document.getElementById("quantityInput");
+      const priceInput = document.getElementById("priceInput");
 
-      // Get selected category
+      const itemName = itemNameInput?.value.trim() || "";
+      const quantity = Math.max(1, parseInt(quantityInput?.value, 10) || 1);
+      const price = parseFloat(priceInput?.value);
       const selectedCategory = document.querySelector(".category-item.active");
       const category = selectedCategory
-        ? selectedCategory.textContent.trim()
+        ? selectedCategory.textContent.trim() || "Other"
         : "Other";
 
-      // Validation
       if (!itemName) {
         showToast("Please enter an item name!");
         recordAdminMetric("errors", 1);
@@ -1501,122 +1625,123 @@ if (saveItemBtn) {
         return;
       }
 
-      if (!price || isNaN(price) || price <= 0) {
+      if (isNaN(price) || price <= 0) {
         showToast("Please enter a valid price!");
         recordAdminMetric("errors", 1);
         recordAdminEvent("Invalid add attempt: invalid price");
         return;
       }
 
-      console.log("Adding item:", { itemName, category, quantity, price });
-
-      // Find existing category or create new one
+      const normalizedName = itemName.toLowerCase();
+      const normalizedCategory = category.toLowerCase();
       const cardContainer = document.querySelector(".card-container");
-      const categoryCards = document.querySelectorAll(".category-card");
-      let categoryFound = false;
+      const categoryCards = cardContainer
+        ? cardContainer.querySelectorAll(".category-card")
+        : [];
+      let categoryCard = null;
 
       categoryCards.forEach((card) => {
         const cardHeader = card.querySelector(".card-header");
         const categoryName = getCategoryNameFromHeader(cardHeader);
-
-        if (categoryName.toLowerCase() === category.toLowerCase()) {
-          categoryFound = true;
-
-          const existingItemSection = Array.from(
-            card.querySelectorAll(".item-card-sec"),
-          ).find((section) => {
-            const itemTitle = section.querySelector(".item-name");
-            return (
-              itemTitle &&
-              itemTitle.textContent.trim().toLowerCase() ===
-                itemName.toLowerCase()
-            );
-          });
-
-          if (existingItemSection) {
-            const itemCard = existingItemSection.querySelector(".item-card");
-            const qtyEl = itemCard?.querySelector(".item-qty");
-            const priceEl = itemCard?.querySelector(".item-price");
-            const currentQty = qtyEl
-              ? parseInt(qtyEl.textContent.replace(/[^0-9]/g, "")) || 0
-              : 0;
-            const currentPrice = priceEl
-              ? parseFloat(priceEl.textContent.replace(/[^0-9\.]/g, "")) || 0
-              : 0;
-            const newQty = currentQty + quantity;
-            const newPrice = currentPrice + price;
-
-            if (qtyEl)
-              qtyEl.textContent = `• ${newQty} item${newQty === 1 ? "" : "s"}`;
-            if (priceEl) priceEl.textContent = `$${newPrice.toFixed(2)}`;
-
-            existingItemSection.dataset.infoStates = JSON.stringify(
-              getItemInfoStates(itemName, category),
-            );
-            updateCardInfoState(existingItemSection, 0);
-
-            const existingDataItem = items.find(
-              (item) =>
-                item.name.toLowerCase() === itemName.toLowerCase() &&
-                item.category.toLowerCase() === category.toLowerCase(),
-            );
-
-            if (existingDataItem) {
-              existingDataItem.quantity = newQty;
-              existingDataItem.price = newPrice;
-              existingDataItem.updatedAt = new Date().toISOString();
-            }
-          } else {
-            const newItemSection = createItemCardSection(
-              itemName,
-              quantity,
-              price,
-            );
-            card.appendChild(newItemSection);
-          }
+        if (categoryName.toLowerCase() === normalizedCategory) {
+          categoryCard = card;
         }
       });
 
-      if (!categoryFound && cardContainer) {
-        const newCategoryCard = document.createElement("div");
-        newCategoryCard.className = "category-card";
-        newCategoryCard.appendChild(
-          createNewCategoryCardSection(category, itemName, quantity, price),
-        );
-        cardContainer.appendChild(newCategoryCard);
+      const existingDataItem = items.find(
+        (item) =>
+          item.name.toLowerCase() === normalizedName &&
+          item.category.toLowerCase() === normalizedCategory,
+      );
+
+      const existingItemSection = categoryCard
+        ? Array.from(categoryCard.querySelectorAll(".item-card-sec")).find(
+            (section) => {
+              const itemTitle = section.querySelector(".item-name");
+              return (
+                itemTitle &&
+                itemTitle.textContent.trim().toLowerCase() === normalizedName
+              );
+            },
+          )
+        : null;
+
+      let updatedQuantity = quantity;
+      let updatedPrice = price;
+
+      if (existingDataItem) {
+        updatedQuantity = existingDataItem.quantity + quantity;
+        updatedPrice = existingDataItem.price + price;
+        existingDataItem.quantity = updatedQuantity;
+        existingDataItem.price = updatedPrice;
+        existingDataItem.updatedAt = new Date().toISOString();
       }
 
-      // Store item with timestamp
-      const itemData = {
-        id: Date.now(),
-        name: itemName,
-        category: category,
-        quantity: quantity,
-        price: price,
-        timestamp: new Date().toISOString(),
-        createdAt: new Date(),
-      };
-      items.push(itemData);
+      if (existingItemSection) {
+        const itemCard = existingItemSection.querySelector(".item-card");
+        const qtyEl = itemCard?.querySelector(".item-qty");
+        const priceEl = itemCard?.querySelector(".item-price");
+
+        if (qtyEl) qtyEl.textContent = formatQuantity(updatedQuantity);
+        if (priceEl) priceEl.textContent = `$${updatedPrice.toFixed(2)}`;
+
+        existingItemSection.dataset.infoStates = JSON.stringify(
+          getItemInfoStates(itemName, category),
+        );
+        updateCardInfoState(existingItemSection, 0);
+      }
+
+      if (!existingItemSection) {
+        if (categoryCard) {
+          categoryCard.appendChild(
+            createItemCardSection(itemName, updatedQuantity, updatedPrice),
+          );
+        } else if (cardContainer) {
+          const newCategoryCard = document.createElement("div");
+          newCategoryCard.className = "category-card";
+          newCategoryCard.appendChild(
+            createNewCategoryCardSection(
+              category,
+              itemName,
+              updatedQuantity,
+              updatedPrice,
+            ),
+          );
+          cardContainer.appendChild(newCategoryCard);
+        }
+      }
+
+      if (!existingDataItem) {
+        items.push({
+          id: Date.now(),
+          name: itemName,
+          category: category,
+          quantity: updatedQuantity,
+          price: updatedPrice,
+          timestamp: new Date().toISOString(),
+          createdAt: new Date(),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
       localStorage.setItem("planup_items", JSON.stringify(items));
       recordAdminMetric("itemsAdded", 1);
       recordAdminEvent(`Item added: ${itemName} (${category})`);
 
-      // Update budget progress
       updateBudgetProgress();
       updateCategoryEmptyState();
       updateGlobalEmptyState();
       updateFilterSortVisibility();
-      updateFilterBar(); // Update filter bar with new categories
+      updateFilterBar();
       filterCategories(activeFilter);
+      renderInsightsChart();
 
-      // Re-initialize interactions
       setTimeout(() => {
         initializeSwipe();
         initializeCardExpansion();
         initializeImageModals();
       }, 100);
 
-      // Close modal and show success
       closeModal();
       showToast("Item added successfully!");
     } catch (error) {
@@ -1624,6 +1749,8 @@ if (saveItemBtn) {
       showToast("Error saving item. Please try again.");
       recordAdminMetric("errors", 1);
       recordAdminEvent(`Save item error: ${error.message}`);
+    } finally {
+      saveItemBtn.disabled = false;
     }
   });
 }
@@ -1793,6 +1920,9 @@ function showNotification(options) {
 
     // Show notification bar with animation
     notificationBar.classList.add("show");
+    searchBar.classList.add("shrink");
+    notificationMessage.classList.add("show");
+    notificationBtn.classList.add("expand");
 
     // Play sound
     playNotificationSound(sound);
@@ -1808,7 +1938,7 @@ function showNotification(options) {
         hideNotification();
       }, 5000);
     }
-  }, 2000); // 2 second delay
+  }, 2000);
 
   // Add to active notifications immediately (not delayed)
   const notificationId = Date.now();
@@ -1834,6 +1964,9 @@ function hideNotification() {
   if (!notificationBar || !searchBar) return;
 
   notificationBar.classList.remove("show");
+  searchBar.classList.remove("shrink");
+  notificationMessage.classList.remove("show");
+  notificationBtn.classList.remove("expand");
 
   setTimeout(() => {
     notificationMessage.textContent = "";
@@ -1897,6 +2030,7 @@ updateGlobalEmptyState();
 updateFilterSortVisibility();
 updateFilterBar(); // Initialize filter bar
 filterCategories(activeFilter);
+renderInsightsChart();
 
 // UPDATE CATEGORY TOTALS
 function updateCategoryTotals(card) {
@@ -1921,15 +2055,11 @@ function updateCategoryTotals(card) {
 
 // CARD EXPANSION
 function initializeCardExpansion() {
-  const cards = document.querySelectorAll(".item-card");
+  document.querySelectorAll(".item-card").forEach((card) => {
+    if (card.dataset.expansionInit === "true") return;
+    card.dataset.expansionInit = "true";
 
-  cards.forEach((card) => {
-    // Remove old listeners to prevent duplicates
-    const newCard = card.cloneNode(true);
-    card.parentNode.replaceChild(newCard, card);
-
-    newCard.addEventListener("click", function (e) {
-      // Don't expand if swiping
+    card.addEventListener("click", function (e) {
       if (this.classList.contains("dragging")) return;
       this.classList.toggle("expanded");
     });

@@ -52,12 +52,6 @@
         </svg>
         History
       </div>
-      <div class="dashboard-btn menu-item" id="dashboardBtn">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm0 5.5a2.5 2.5 0 1 1 0 5a2.5 2.5 0 0 1 0-5Zm1.5 11.5h-3v-1.5h3V19Zm0-3.25h-3v-6h3v6Z" />
-        </svg>
-        Admin
-      </div>
       <div class="space-between">
         <div class="divider"></div>
       </div>
@@ -128,7 +122,7 @@
       </div>
       <div class="notification-bar" id="notificationBar">
         <button class="notification-btn" id="notificationBtn">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#1f1f1f"
             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
             class="lucide lucide-bell-icon lucide-bell">
             <path d="M10.268 21a2 2 0 0 0 3.464 0" />
@@ -803,9 +797,54 @@
       <div class="header-action"></div>
     </div>
     <div class="full-page-content">
-      <div class="notification-empty">
-        <div class="empty-page-card">
-          <p>Coming soon</p>
+      <div class="profile-card">
+        <div class="p-header">
+          <h2>Appearance</h2>
+        </div>
+        <div class="p-element">
+          <div class="p-txt">
+            <h3>Theme</h3>
+            <p>Export your grocery data</p>
+          </div>
+          <div class="toggler" id="exportToggler">
+            <div class="toggle-ground">
+              <div class="toggle"></div>
+              <div class="click-listener"></div>
+            </div>
+          </div>
+        </div>
+        <div class="export-action" id="exportAction">
+          <svg xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 640 640"><!--!Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2026 Fonticons, Inc.-->
+            <path
+              d="M384 64C366.3 64 352 78.3 352 96C352 113.7 366.3 128 384 128L466.7 128L265.3 329.4C252.8 341.9 252.8 362.2 265.3 374.7C277.8 387.2 298.1 387.2 310.6 374.7L512 173.3L512 256C512 273.7 526.3 288 544 288C561.7 288 576 273.7 576 256L576 96C576 78.3 561.7 64 544 64L384 64zM144 160C99.8 160 64 195.8 64 240L64 496C64 540.2 99.8 576 144 576L400 576C444.2 576 480 540.2 480 496L480 416C480 398.3 465.7 384 448 384C430.3 384 416 398.3 416 416L416 496C416 504.8 408.8 512 400 512L144 512C135.2 512 128 504.8 128 496L128 240C128 231.2 135.2 224 144 224L224 224C241.7 224 256 209.7 256 192C256 174.3 241.7 160 224 160L144 160z" />
+          </svg>
+          <h3>Export list</h3>
+        </div>
+      </div>
+      <div class="profile-card">
+        <div class="p-header">
+          <h2>Appearance</h2>
+        </div>
+        <div class="p-element">
+          <div class="p-txt">
+            <h3>Theme</h3>
+            <p>Export your grocery data</p>
+          </div>
+          <div class="toggler" id="exportToggler">
+            <div class="toggle-ground">
+              <div class="toggle"></div>
+              <div class="click-listener"></div>
+            </div>
+          </div>
+        </div>
+        <div class="export-action" id="exportAction">
+          <svg xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 640 640"><!--!Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2026 Fonticons, Inc.-->
+            <path
+              d="M384 64C366.3 64 352 78.3 352 96C352 113.7 366.3 128 384 128L466.7 128L265.3 329.4C252.8 341.9 252.8 362.2 265.3 374.7C277.8 387.2 298.1 387.2 310.6 374.7L512 173.3L512 256C512 273.7 526.3 288 544 288C561.7 288 576 273.7 576 256L576 96C576 78.3 561.7 64 544 64L384 64zM144 160C99.8 160 64 195.8 64 240L64 496C64 540.2 99.8 576 144 576L400 576C444.2 576 480 540.2 480 496L480 416C480 398.3 465.7 384 448 384C430.3 384 416 398.3 416 416L416 496C416 504.8 408.8 512 400 512L144 512C135.2 512 128 504.8 128 496L128 240C128 231.2 135.2 224 144 224L224 224C241.7 224 256 209.7 256 192C256 174.3 241.7 160 224 160L144 160z" />
+          </svg>
+          <h3>Export list</h3>
         </div>
       </div>
     </div>
@@ -860,8 +899,8 @@
 
 
   <!--Insights Page-->
-  <div class="breakdown-overlay"></div>
   <main class="insights-page" id="insightsPage">
+    <div class="breakdown-overlay"></div>
     <div class="nav-page-header">
       <h1>
         Insights
@@ -977,9 +1016,9 @@
           </div>
           <div class="break-down-section">
             <h3>Category Breakdown</h3>
-
             <div class="breakdown-by-price-btn" id="breakdownByPriceBtn">
-              <span>By used budget</span>
+              <button id="byUsedBudget">By used budget</button>
+              <button id="byTotalBudget">By total budget</button>
               <span>By total budget</span>
             </div>
           </div>
