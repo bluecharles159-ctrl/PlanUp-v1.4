@@ -507,6 +507,41 @@ settingsBtn.addEventListener("click", () => {
   closeMenu();
 });
 
+const currencyDiv = document.querySelector(".currency-div");
+const currencyOverlay = document.querySelector(".currency-overlay");
+
+currencyDiv.addEventListener("click", () => {
+  currencyOverlay.classList.add("show");
+});
+currencyOverlay.addEventListener("click", (e) => {
+  e.stopPropagation();
+  currencyOverlay.classList.remove("show");
+});
+
+const deleteAction = document.getElementById("deleteAction");
+const deletePanel = document.getElementById("deletePanel");
+
+deleteAction.addEventListener("click", () => {
+  deletePanel.classList.add("show");
+});
+
+const faqBox = document.querySelector(".faqs-box");
+const faqNAnsWrapper = document.querySelector(".faq-n-ans-wrapper");
+const faqNAns = document.querySelectorAll(".faq-n-ans");
+const faqQuest = document.querySelectorAll(".faq-quest");
+const faqAns = document.querySelectorAll(".faq-ans");
+
+faqNAns.forEach((faq) => {
+  faq.addEventListener("click", () => {
+    faqNAns.forEach((otherFaq) => {
+      if (otherFaq !== faq) {
+        otherFaq.classList.remove("expand");
+      }
+    });
+    faq.classList.toggle("expand");
+  });
+});
+
 // ===== MENU =====
 menuBtn.addEventListener("click", () => {
   menuPage.classList.add("show");
@@ -552,6 +587,10 @@ const dashboardBtn = document.getElementById("dashboardBtn");
 const scheduleBtn = document.getElementById("scheduleBtn");
 
 const addToGet = document.getElementById("addToGet");
+addToGet.addEventListener("click", () => {
+  closePage();
+  openRecipePage();
+});
 
 function closeMenu() {
   menuPage.classList.remove("show");
@@ -756,11 +795,16 @@ if (fabCamera) {
   });
 }
 
+function openRecipePage() {
+  recipePage.classList.add("show");
+  closeFab();
+  closeMenu();
+}
+
 if (recipeBtn) {
   recipeBtn.addEventListener("click", (e) => {
     e.stopPropagation();
-    recipePage.classList.add("show");
-    closeFab();
+    openRecipePage();
   });
 }
 
@@ -1137,6 +1181,19 @@ function getItemInfoStates(itemName, category) {
   });
 }
 
+function getDateInfo(infoType) {
+  switch (infoType) {
+    case "warning":
+      return { bg: "#fee2e2", color: "#b91c1c" };
+    case "recommendation":
+      return { bg: "#e6ffed", color: "#166534" };
+    case "reminder":
+      return { bg: "#fff7cd", color: "#92400e" };
+    default:
+      return { bg: "#eef2ff", color: "#4338ca" };
+  }
+}
+
 function formatQuantity(quantity) {
   return `• ${quantity} item${quantity === 1 ? "" : "s"}`;
 }
@@ -1171,7 +1228,12 @@ function updateCardInfoState(section, nextIndex = 0) {
   if (timeEl) timeEl.textContent = state.timeLabel;
 
   const followEl = section.querySelector(".item-time-info");
-  if (followEl) followEl.textContent = state.followUp;
+  if (followEl) {
+    const dateInfo = getDateInfo(state.infoType);
+    followEl.textContent = state.followUp;
+    followEl.style.background = dateInfo.bg;
+    followEl.style.color = dateInfo.color;
+  }
 
   const fullMessage = section.querySelector(".info-full-message");
   if (fullMessage) fullMessage.textContent = state.fullMessage;
@@ -1255,27 +1317,25 @@ function createItemCardSection(itemName, quantity, price) {
   section.dataset.infoStates = JSON.stringify(infoStates);
   section.dataset.infoIndex = "0";
 
+  const dateInfo = getDateInfo(infoStates[0].infoType);
+
   section.innerHTML = `
     <div class="item-image-modal"></div>
     <div class="item-card">
-      <div class="img" style="border-color: ${accent.border}; background: linear-gradient(145deg, ${accent.background}, ${accent.backgroundFade});">
-        <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 256 256">
-          <path fill="currentColor" d="M82 56V24a6 6 0 0 1 12 0v32a6 6 0 0 1-12 0m38 6a6 6 0 0 0 6-6V24a6 6 0 0 0-12 0v32a6 6 0 0 0 6 6m32 0a6 6 0 0 0 6-6V24a6 6 0 0 0-12 0v32a6 6 0 0 0 6 6m94 58v8a38 38 0 0 1-36.94 38a94.55 94.55 0 0 1-31.13 44H208a6 6 0 0 1 0 12H32a6 6 0 0 1 0-12h30.07A94.34 94.34 0 0 1 26 136V88a6 6 0 0 1 6-6h176a38 38 0 0 1 38 38m-44 16V94H38v42a82.27 82.27 0 0 0 46.67 74h70.66A82.27 82.27 0 0 0 202 136m32-16a26 26 0 0 0-20-25.29V136a93 93 0 0 1-1.69 17.64A26 26 0 0 0 234 128Z"/>
-        </svg>
-      </div>
+      <div class="img" style="border-color: ${accent.border}; background-image: url("images/image1.jpg")"></div>
       <div class="details">
         <div class="item-name">${itemName}</div>
         <div class="item-info" tabindex="0" role="button">
           <div class="top-info">
-            <div class="source-badge source-${infoStates[0].sourceCategory}" data-source-url="${infoStates[0].sourceUrl}">
+            <div class="store-purchased-from source-badge source-${infoStates[0].sourceCategory}" data-source-url="${infoStates[0].sourceUrl}">
               <span class="source-icon">${infoStates[0].sourceIcon}</span>
               <span class="source-label">${infoStates[0].sourceLabel}</span>
             </div>
-            <div class="info-line info-${infoStates[0].infoType}">${infoStates[0].infoMessage}</div>
+            <div class="store-info info-line info-${infoStates[0].infoType}">${infoStates[0].infoMessage}</div>
           </div>
           <div class="bottom-info">
-            <div class="time-item-added">${infoStates[0].timeLabel}</div>
-            <div class="item-time-info">${infoStates[0].followUp}</div>
+            <div class="time-item-added" data-index="0">${infoStates[0].timeLabel}</div>
+            <div class="item-time-info" style="background:${dateInfo.bg}; color:${dateInfo.color}">${infoStates[0].followUp}</div>
           </div>
           <div class="info-expandable">
             <div class="info-full-message">${infoStates[0].fullMessage}</div>
@@ -1856,6 +1916,11 @@ function updateBudgetProgress() {
     if (trendIcon) trendIcon.classList.add("warning");
     if (progressStatus) progressStatus.textContent = "Watch Spending";
     budgetExceededNotified = false; // Reset notification flag
+  } else if (percentage === 100) {
+    budgetCard.classList.add("warning");
+    if (trendIcon) trendIcon.classList.add("warning");
+    if (progressStatus) progressStatus.textContent = "Budget Reached";
+    budgetExceededNotified = false;
   } else {
     budgetCard.classList.add("over");
     if (trendIcon) trendIcon.classList.add("over");
@@ -1875,7 +1940,7 @@ function showBudgetNotification() {
     message: "Budget exceeded!",
     type: "warning",
     icon: "budget",
-    sound: "metal",
+    sound: "iphone",
     autoHide: true,
     onClick: () => {
       showNotificationPage();
@@ -1984,7 +2049,43 @@ function playNotificationSound(type = "metal") {
     osc.connect(gainNode);
     gainNode.connect(audioContext.destination);
 
-    if (type === "metal") {
+    if (type === "iphone") {
+      const osc2 = audioContext.createOscillator();
+      const gain2 = audioContext.createGain();
+
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(950, audioContext.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(
+        820,
+        audioContext.currentTime + 0.18,
+      );
+      gainNode.gain.setValueAtTime(0.18, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(
+        0.001,
+        audioContext.currentTime + 0.35,
+      );
+
+      osc2.type = "sine";
+      osc2.frequency.setValueAtTime(1400, audioContext.currentTime);
+      osc2.frequency.exponentialRampToValueAtTime(
+        1200,
+        audioContext.currentTime + 0.18,
+      );
+      gain2.gain.setValueAtTime(0.12, audioContext.currentTime);
+      gain2.gain.exponentialRampToValueAtTime(
+        0.001,
+        audioContext.currentTime + 0.35,
+      );
+
+      gain2.connect(audioContext.destination);
+      osc2.connect(gain2);
+
+      const now = audioContext.currentTime;
+      osc.start(now);
+      osc2.start(now);
+      osc.stop(now + 0.35);
+      osc2.stop(now + 0.35);
+    } else if (type === "metal") {
       osc.type = "triangle";
       osc.frequency.setValueAtTime(880, audioContext.currentTime);
       osc.frequency.exponentialRampToValueAtTime(
@@ -2294,6 +2395,7 @@ const settingsOptions = {
   "theme-toggle": () => {
     const body = document.body;
     body.classList.toggle("dark-mode");
+    //if()
     localStorage.setItem(
       "theme",
       body.classList.contains("dark-mode") ? "dark" : "light",
@@ -2578,6 +2680,9 @@ function updateNotificationPage() {
           <h3>${notification.message}</h3>
           <div class="notification-type-label ${notification.type}">
             ${typeTitle}
+          </div>
+          <div class="notification-summary">
+          "Rice alone used over 10% of your budget. Check your insights to find more"
           </div>
           <div class="time-container">
             <span class="notification-time">${timeAgo}</span>

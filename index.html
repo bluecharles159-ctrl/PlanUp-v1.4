@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
   <meta charset="UTF-8">
@@ -112,7 +112,7 @@
   <!--Home Page-->
   <main class="home-page" id="homePage">
     <div class="page-header">
-      <button class="menu-btn" id="menuBtn">
+      <button type="button" class="menu-btn" id="menuBtn">
         <svg xmlns="http://www.w3.org/2000/svg" height="26px" viewBox="0 -960 960 960" width="26px" fill="#1f1f1f">
           <path d="M120-240v-80h720v80H120Zm0-200v-80h720v80H120Zm0-200v-80h720v80H120Z" />
         </svg>
@@ -122,7 +122,7 @@
       </div>
       <div class="notification-bar" id="notificationBar">
         <button class="notification-btn" id="notificationBtn">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#1f1f1f"
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="green"
             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
             class="lucide lucide-bell-icon lucide-bell">
             <path d="M10.268 21a2 2 0 0 0 3.464 0" />
@@ -382,6 +382,7 @@
     <div class="modal-container">
       <div class="modal-header">
         <h2>Add New Item</h2>
+        <button type="button" class="concurrent-add" id="concurrentAddBtn">Concurrent Add</button>
       </div>
       <div class="modal-body">
         <div class="form-group">
@@ -407,7 +408,8 @@
             <div class="category-item-wrapper">
               <div class="category-item active auto-category-item">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+                  <path
+                    d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
                 </svg>
                 Auto
               </div>
@@ -427,9 +429,12 @@
               <input type="text" placeholder="Add new category" id="customCategoryInput">
             </div>
           </div>
-          <button type="button" class="auto-categorize-btn" id="autoCategorizeBtn" title="Auto-categorize based on item name">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/>
+          <button type="button" class="auto-categorize-btn" id="autoCategorizeBtn"
+            title="Auto-categorize based on item name">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2">
+              <path
+                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z" />
             </svg>
           </button>
         </div>
@@ -797,54 +802,132 @@
       <div class="header-action"></div>
     </div>
     <div class="full-page-content">
-      <div class="profile-card">
-        <div class="p-header">
-          <h2>Appearance</h2>
-        </div>
-        <div class="p-element">
-          <div class="p-txt">
-            <h3>Theme</h3>
-            <p>Export your grocery data</p>
+      <div class="settings-content">
+        <div class="settings-card">
+          <div class="s-header">
+            <h2>Appearance</h2>
           </div>
-          <div class="toggler" id="exportToggler">
-            <div class="toggle-ground">
-              <div class="toggle"></div>
-              <div class="click-listener"></div>
+          <div class="p-element">
+            <div class="p-txt">
+              <h3>Theme</h3>
+              <p>Switch between Light, Dark or System theme</p>
+            </div>
+            <div class="toggler" id="exportToggler">
+              <div class="toggle-ground">
+                <div class="toggle"></div>
+                <div class="click-listener"></div>
+              </div>
             </div>
           </div>
         </div>
-        <div class="export-action" id="exportAction">
-          <svg xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 640 640"><!--!Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2026 Fonticons, Inc.-->
-            <path
-              d="M384 64C366.3 64 352 78.3 352 96C352 113.7 366.3 128 384 128L466.7 128L265.3 329.4C252.8 341.9 252.8 362.2 265.3 374.7C277.8 387.2 298.1 387.2 310.6 374.7L512 173.3L512 256C512 273.7 526.3 288 544 288C561.7 288 576 273.7 576 256L576 96C576 78.3 561.7 64 544 64L384 64zM144 160C99.8 160 64 195.8 64 240L64 496C64 540.2 99.8 576 144 576L400 576C444.2 576 480 540.2 480 496L480 416C480 398.3 465.7 384 448 384C430.3 384 416 398.3 416 416L416 496C416 504.8 408.8 512 400 512L144 512C135.2 512 128 504.8 128 496L128 240C128 231.2 135.2 224 144 224L224 224C241.7 224 256 209.7 256 192C256 174.3 241.7 160 224 160L144 160z" />
-          </svg>
-          <h3>Export list</h3>
-        </div>
-      </div>
-      <div class="profile-card">
-        <div class="p-header">
-          <h2>Appearance</h2>
-        </div>
-        <div class="p-element">
-          <div class="p-txt">
-            <h3>Theme</h3>
-            <p>Export your grocery data</p>
+        <div class="settings-card">
+          <div class="s-header">
+            <h2>Recipe & Cooking</h2>
           </div>
-          <div class="toggler" id="exportToggler">
-            <div class="toggle-ground">
-              <div class="toggle"></div>
-              <div class="click-listener"></div>
+          <div class="p-element">
+            <div class="p-txt">
+              <h3>Serving Size</h3>
+              <p>Default number of people to scale recipe for</p>
+            </div>
+            <input class="settings-value" placeholder="4" value="4">
+          </div>
+          <div class="p-element">
+            <div class="p-txt">
+              <h3>Cook Mode</h3>
+              <p>Keep the screen awake while viewing a recipe</p>
+            </div>
+            <div class="toggler" id="exportToggler">
+              <div class="toggle-ground">
+                <div class="toggle"></div>
+                <div class="click-listener"></div>
+              </div>
             </div>
           </div>
         </div>
-        <div class="export-action" id="exportAction">
-          <svg xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 640 640"><!--!Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2026 Fonticons, Inc.-->
-            <path
-              d="M384 64C366.3 64 352 78.3 352 96C352 113.7 366.3 128 384 128L466.7 128L265.3 329.4C252.8 341.9 252.8 362.2 265.3 374.7C277.8 387.2 298.1 387.2 310.6 374.7L512 173.3L512 256C512 273.7 526.3 288 544 288C561.7 288 576 273.7 576 256L576 96C576 78.3 561.7 64 544 64L384 64zM144 160C99.8 160 64 195.8 64 240L64 496C64 540.2 99.8 576 144 576L400 576C444.2 576 480 540.2 480 496L480 416C480 398.3 465.7 384 448 384C430.3 384 416 398.3 416 416L416 496C416 504.8 408.8 512 400 512L144 512C135.2 512 128 504.8 128 496L128 240C128 231.2 135.2 224 144 224L224 224C241.7 224 256 209.7 256 192C256 174.3 241.7 160 224 160L144 160z" />
-          </svg>
-          <h3>Export list</h3>
+        <div>
+        </div>
+        <div class="settings-card">
+          <div class="s-header">
+            <h2>Region</h2>
+          </div>
+          <div class="p-element">
+            <div class="p-txt">
+              <h3>Country</h3>
+              <p>Set your primary region</p>
+            </div>
+            <div class="toggler" id="exportToggler">
+              <div class="toggle-ground">
+                <div class="toggle"></div>
+                <div class="click-listener"></div>
+              </div>
+            </div>
+          </div>
+          <div class="p-element">
+            <div class="p-txt">
+              <h3>Convert Currency</h3>
+              <p>Convert Dollar currency to your local currency</p>
+            </div>
+            <div class="toggler" id="exportToggler">
+              <div class="toggle-ground">
+                <div class="toggle"></div>
+                <div class="click-listener"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="settings-card">
+          <div class="s-header">
+            <h2>Account & App</h2>
+          </div>
+          <div class="p-element">
+            <div class="p-txt">
+              <h3>Notifications</h3>
+              <p>Manage push alerts for sales and meal reminders</p>
+            </div>
+            <div class="toggler" id="exportToggler">
+              <div class="toggle-ground">
+                <div class="toggle"></div>
+                <div class="click-listener"></div>
+              </div>
+            </div>
+          </div>
+          <div class="p-element">
+            <div class="p-txt">
+              <h3>Privacy</h3>
+              <p>Manage your data and account security</p>
+            </div>
+            <div class="toggler" id="exportToggler">
+              <div class="toggle-ground">
+                <div class="toggle"></div>
+                <div class="click-listener"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="settings-card">
+          <div class="s-header">
+            <h2>About</h2>
+          </div>
+          <div class="p-element">
+            <div class="p-txt">
+              <h3>App Version</h3>
+              <p>1.0.0</p>
+            </div>
+          </div>
+        </div>
+        <div class="settings-card">
+          <div class="reachus-sec">
+            <div class="p-element">
+              <div class="p-txt">
+                <h3>Report a Bug</h3>
+                <p>Let us know if you encounter any issues</p>
+              </div>
+            </div>
+            <div class="p-txt">
+              <h3><a href="mailto:planupsupport@gmail.com">Contact Support</a></h3>
+              <p>Have questions or feedback? Get in touch with us!</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -862,15 +945,6 @@
       <div class="header-action"></div>
     </div>
     <div class="full-page-content">
-
-      <!-- Empty state -->
-      <!--div class="notification-empty">
-        <div class="empty-page-card">
-          <p>Coming soon</p>
-        </div>
-      </div-->
-
-      <!-- Active state -->
       <div class="feedback-sec">
         <input type="text" placeholder="What's your issue?.." id="feedbackInput">
       </div>
@@ -1168,7 +1242,7 @@
             </div>
             <div class="p-element">
               <div class="p-txt">
-                <h3>Alert at budget %</h3>
+                <h3>Alert at budget (%)</h3>
               </div>
               <input class="p-element-input" id="alertAtBudgetInput" placeholder="80">
             </div>
@@ -1182,7 +1256,7 @@
               <div class="p-txt">
                 <h3>Currency</h3>
               </div>
-              <div class="p-element-selector">$ USD</div>
+              <div class="currency-div">$ USD</div>
             </div>
           </div>
           <div class="profile-card" id="dataManagementCard">
@@ -1195,7 +1269,7 @@
                 </svg>
               </div>
             </div>
-            <div class="delete-action" id="">
+            <div class="delete-action" id="deleteAction">
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
                 <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
                   <path
@@ -1219,14 +1293,22 @@
                       d="M13.765 2.152C13.398 2 12.932 2 12 2s-1.398 0-1.765.152a2 2 0 0 0-1.083 1.083c-.092.223-.129.484-.143.863a1.62 1.62 0 0 1-.79 1.353a1.62 1.62 0 0 1-1.567.008c-.336-.178-.579-.276-.82-.308a2 2 0 0 0-1.478.396C4.04 5.79 3.806 6.193 3.34 7s-.7 1.21-.751 1.605a2 2 0 0 0 .396 1.479c.148.192.355.353.676.555c.473.297.777.803.777 1.361s-.304 1.064-.777 1.36c-.321.203-.529.364-.676.556a2 2 0 0 0-.396 1.479c.052.394.285.798.75 1.605c.467.807.7 1.21 1.015 1.453a2 2 0 0 0 1.479.396c.24-.032.483-.13.819-.308a1.62 1.62 0 0 1 1.567.008c.483.28.77.795.79 1.353c.014.38.05.64.143.863a2 2 0 0 0 1.083 1.083C10.602 22 11.068 22 12 22s1.398 0 1.765-.152a2 2 0 0 0 1.083-1.083c.092-.223.129-.483.143-.863c.02-.558.307-1.074.79-1.353a1.62 1.62 0 0 1 1.567-.008c.336.178.579.276.819.308a2 2 0 0 0 1.479-.396c.315-.242.548-.646 1.014-1.453s.7-1.21.751-1.605a2 2 0 0 0-.396-1.479c-.148-.192-.355-.353-.676-.555A1.62 1.62 0 0 1 19.562 12c0-.558.304-1.064.777-1.36c.321-.203.529-.364.676-.556a2 2 0 0 0 .396-1.479c-.052-.394-.285-.798-.75-1.605c-.467-.807-.7-1.21-1.015-1.453a2 2 0 0 0-1.479-.396c-.24.032-.483.13-.82.308a1.62 1.62 0 0 1-1.566-.008a1.62 1.62 0 0 1-.79-1.353c-.014-.38-.05-.64-.143-.863a2 2 0 0 0-1.083-1.083Z" />
                   </g>
               </span>
-              </h3>
+            </div>
+          </div>
+          <div class="currency-overlay">
+            <div class="currency-seletor-div">
+              <div class="currency-div-select">USD - $</div>
+              <div class="currency-div-select">GHC - ¢</div>
+              <div class="currency-div-select">EUR - £</div>
+              <div class="currency-div-select">YEN - ¥</div>
+              <div class="currency-div-select">WIN - ₩</div>
             </div>
           </div>
         </div>
+
       </div>
     </div>
-    </div>
-    </div>
+
 
   </main>
 
@@ -1257,10 +1339,92 @@
     </div>
   </div>
 
+  <div class="delete-panel" id="deletePanel">
+    <div class="scroll-handler"></div>
+    <div class="confirm-delete-message">
+      <h3>Delete your PlanUp data?</h3>
+      <p>This action cannot be reversed. Are you sure you want to clear all data?</p>
+    </div>
+    <div class="feedback-box">
+      <h3><i>feedback</i></h3>
+      <p><i>Want to share with us why you want to delete your PlanUp data?<br>You can always reach us for </i><a
+          href="mailto:planupsupport@gmail.com"><i>help.</i></a></p>
+    </div>
+    <div class="faqs-box">
+      <h3><i>faqs</i></h3>
+
+
+      <div class="faq-n-ans-wrapper">
+        <div class="faq-n-ans">
+          <div class="faq-quest">
+            <h4>Can I export my PlanUp data to my other devices?</h4>
+          </div>
+          <div class="faq-ans">
+            <p>You can export your PlanUp data to any of your other devices. <br><strong>Data include</strong><br>
+            <ul>
+              <li>Grocery list data</li>
+              <li>Recipe data</li>
+              <li>Insights data</li>
+              <li>Recipe menu/course data</li>
+              <li>Budget & spending data</li>
+            </ul>
+            Find the export button on the profile page
+            </p>
+          </div>
+        </div>
+        <div class="faq-n-ans">
+          <div class="faq-quest">
+            <h4>Can I share my grocery list and recipes with others?</h4>
+          </div>
+          <div class="faq-ans">
+            <p>Sure your can share your grocery list and recipes with others. You can also share recipe menus or
+              courses, budget and spending data and to-get list data.</p>
+          </div>
+        </div>
+        <div class="faq-n-ans">
+          <div class="faq-quest">
+            <h4>Can I send my data to my other accounts or
+              @place of use?</h4>
+          </div>
+          <div class="faq-ans">
+            <p>Yeah, you can send your data from one account or @place of use to another account or @place of use.
+              You'll have the same data where you sent your data to</p>
+          </div>
+        </div>
+        <div class="faq-n-ans">
+          <div class="faq-quest">
+            <h4>Do I need internet to use PlanUp?</h4>
+          </div>
+          <div class="faq-ans">
+            <p>PlanUp can be used offline for the basic usage but you may need an internet connection to find recipes.
+              Data from recipes you visit will be saved in a cache folder so you don't really need internet to view
+              them</p>
+          </div>
+        </div>
+        <div class="faq-n-ans">
+          <div class="faq-quest">
+            <h4>What happens when I clear all data?</h4>
+          </div>
+          <div class="faq-ans">
+            <p>All of your data will be cleared from all of your devices. Your can't restore or access them anymore.
+              Please be fully sure before you take this action</p>
+          </div>
+        </div>
+      </div>
+      <div class="show-more-wrapper">
+        <div class="show-more">show more</div>
+      </div>
+    </div>
+    <div class="decision-box">
+      <div class="decision-action" id="cancelAction">Cancel</div>
+      <div class="decision-action" id="confirmAction">Delete</div>
+    </div>
+  </div>
+
 
   <!--Premium Settings Page-->
   <!--div class="full-page settings-page" id="settingsPage"-->
-  <div class="settings-page" id="settingsPage">
+  <!-- <div class="settings-page" id="settingsPage">
     <div class="full-page-header settings-header">
       <button class="back-btn">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
@@ -1273,7 +1437,7 @@
 
     <div class="full-page-content settings-content">
 
-      <!-- User Card -->
+      
       <div class="settings-user-card">
         <div class="settings-avatar">
           <div class="avatar-circle">
@@ -1293,7 +1457,6 @@
         </div>
       </div>
 
-      <!-- Preferences Section -->
       <div class="settings-section">
         <h4 class="section-title">Preferences</h4>
 
@@ -1341,7 +1504,7 @@
         </div>
       </div>
 
-      <!-- Budget Section -->
+      
       <div class="settings-section">
         <h4 class="section-title">Budget</h4>
 
@@ -1375,7 +1538,6 @@
         </div>
       </div>
 
-      <!-- Data Section -->
       <div class="settings-section">
         <h4 class="section-title">Data & Privacy</h4>
 
@@ -1432,7 +1594,7 @@
         </div>
       </div>
 
-      <!-- Support Section -->
+      
       <div class="settings-section">
         <h4 class="section-title">Support</h4>
 
@@ -1466,14 +1628,14 @@
         </div>
       </div>
 
-      <!-- App Info -->
+      
       <div class="settings-footer">
         <p>planUp v1.0.0</p>
         <p>Made with ❤️ for smart shoppers</p>
       </div>
 
     </div>
-  </div>
+  </div> -->
 
 
 </body>
