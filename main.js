@@ -1,11 +1,3 @@
-// ===== COMPLETE FIXED planUp JavaScript =====
-// This file contains ALL fixes:
-// ✅ Budget bar animation working
-// ✅ Swipe-to-delete/done on item cards
-// ✅ All navigation working
-// ✅ Insights page working
-// ✅ Profile account toggle working
-
 // ===== ELEMENT REFERENCES =====
 const periodBtn = document.getElementById("periodBtn");
 const periodWrapper = document.getElementById("periodWrapper");
@@ -33,6 +25,18 @@ const estimatesValue = document.getElementById("estimatesValue");
 const remainingValue = document.getElementById("remainingValue");
 const avgSpending = document.getElementById("avgSpending");
 const itemCount = document.getElementById("itemCount");
+
+let isScrolling;
+
+window.addEventListener('scroll', () => {
+  document.body.classList.add("show-scrollbar");
+
+  window.clearTimeout(isScrolling);
+
+  isScrolling = setTimeout(() => {
+    document.body.classList.remove("show-scrollbar");
+  }, 1200);
+}, {passive: true});
 
 // State variables
 let items = JSON.parse(localStorage.getItem("planup_items")) || [];
@@ -483,11 +487,11 @@ document.querySelectorAll(".toggler").forEach((toggler) => {
     toggle.classList.toggle("on");
     toggleGround.classList.toggle("on");
 
-    /*if (toggler.id === "exportToggler") {
+    /* if (toggler.id === "exportToggler") {
       showToast("Export list toggled");
     } else if (toggler.id === "budgetAlertsToggler") {
       showToast("Budget alerts toggled");
-    }*/
+    } */
   });
 });
 
@@ -531,15 +535,64 @@ const faqNAns = document.querySelectorAll(".faq-n-ans");
 const faqQuest = document.querySelectorAll(".faq-quest");
 const faqAns = document.querySelectorAll(".faq-ans");
 
+function updateFaqWrapperState() {
+  const hasOpenFaq = Array.from(faqNAns).some((faq) =>
+    faq.classList.contains("expand"),
+  );
+
+  if (faqNAnsWrapper.classList.contains("expand")) {
+    faqNAnsWrapper.classList.remove("expand-partial");
+    return;
+  }
+
+  if (hasOpenFaq) {
+    faqNAnsWrapper.classList.add("expand-partial");
+  } else {
+    faqNAnsWrapper.classList.remove("expand-partial");
+  }
+}
+
 faqNAns.forEach((faq) => {
   faq.addEventListener("click", () => {
-    faqNAns.forEach((otherFaq) => {
-      if (otherFaq !== faq) {
-        otherFaq.classList.remove("expand");
-      }
-    });
-    faq.classList.toggle("expand");
+    const wasOpen = faq.classList.contains("expand");
+
+    if (wasOpen) {
+      faq.classList.remove("expand");
+    } else {
+      faqNAns.forEach((otherFaq) => {
+        if (otherFaq !== faq) {
+          otherFaq.classList.remove("expand");
+        }
+      });
+      faq.classList.add("expand");
+    }
+
+    faqNAnsWrapper.classList.remove("expand");
+    updateFaqWrapperState();
   });
+});
+
+const showMoreFaqs = document.querySelector(".show-more");
+
+showMoreFaqs.addEventListener("click", () => {
+  const isExpanded = faqNAnsWrapper.classList.toggle("expand");
+  if (isExpanded) {
+    faqNAnsWrapper.classList.remove("expand-partial");
+  } else {
+    updateFaqWrapperState();
+  }
+  if (faqNAnsWrapper.classList.contains("expand")) {
+    showMoreFaqs.textContent = "show less";
+  } else {
+    showMoreFaqs.textContent = "show more";
+  }
+});
+
+const cancelAction = document.getElementById("cancelAction");
+const confirmDeleteAction = document.getElementById("confirmDeleteAction");
+
+cancelAction.addEventListener("click", () => {
+  deletePanel.classList.remove("show");
 });
 
 // ===== MENU =====
@@ -570,9 +623,12 @@ function closePage() {
   if (toGetListPage) toGetListPage.classList.remove("show");
   if (favoritesPage) favoritesPage.classList.remove("show");
   if (schedulePage) schedulePage.classList.remove("show");
+  if (historyPage) historyPage.classList.remove("show");
   if (recipePage) recipePage.classList.remove("show");
   if (feedbackPage) feedbackPage.classList.remove("show");
   if (settingsPage) settingsPage.classList.remove("show");
+  menuPage.classList.remove("show");
+  menuOverlay.classList.remove("show");
 }
 
 backFromPage.forEach((arrow) => {
@@ -639,33 +695,32 @@ if (dashboardBtn) {
 const favIngredientsBtn = document.getElementById("favIngredientsBtn");
 const favRecipeBtn = document.getElementById("favRecipeBtn");
 const favFilterContainer = document.getElementById("favFilterContainer");
-const favIngTab = document.getElementById("favIngTab");
-const favRecTab = document.getElementById("favRecTab");
-const favIngBtn = document.getElementById("favIngredientsBtn");
-const favRecBtn = document.getElementById("favRecipeBtn");
+const favIngredientsTab = document.getElementById("favIngredientsTab");
+const favRecipesTab = document.getElementById("favRecipesTab");
+const favRecipesBtn = document.getElementById("favRecipeBtn");
 const favFiltBtn = document.querySelectorAll(".fav-filter-btn");
 
 favIngredientsBtn.addEventListener("click", () => {
-  favFilterContainer.classList.add("ingred");
-  favFilterContainer.classList.remove("recipe");
-  /*favIngBtn.classList.add('active');
+  favFilterContainer.classList.add("ingredients");
+  favFilterContainer.classList.remove("recipes");
+  /*favIngredientsBtn.classList.add('active');
    */
-  favRecBtn.classList.remove("active");
-  favRecTab.style.transform = "scale(70%)";
-  favIngTab.style.transform = "scale(100%)";
-  favRecTab.style.transition = ".3s ease";
-  favIngTab.style.transition = ".2s ease";
+  favRecipesBtn.classList.remove("active");
+  favRecipesTab.style.transform = "scale(70%)";
+  favIngredientsTab.style.transform = "scale(100%)";
+  favRecipesTab.style.transition = ".3s ease";
+  favIngredientsTab.style.transition = ".2s ease";
 });
 
 favRecipeBtn.addEventListener("click", () => {
-  favFilterContainer.classList.add("recipe");
-  favFilterContainer.classList.remove("ingred");
-  /*favIngBtn.classList.remove('active');
-  favRecBtn.classList.add('active');*/
-  favIngTab.style.transform = "scale(70%)";
-  favRecTab.style.transform = "scale(100%)";
-  favIngTab.style.transition = ".3s ease";
-  favRecTab.style.transition = ".3s ease";
+  favFilterContainer.classList.add("recipes");
+  favFilterContainer.classList.remove("ingredients");
+  /*favIngredientsBtn.classList.remove('active');
+  favRecipesBtn.classList.add('active');*/
+  favIngredientsTab.style.transform = "scale(70%)";
+  favRecipesTab.style.transform = "scale(100%)";
+  favIngredientsTab.style.transition = ".3s ease";
+  favRecipesTab.style.transition = ".3s ease";
 });
 
 favFiltBtn.forEach((filtBtn) => {
@@ -678,7 +733,6 @@ favFiltBtn.forEach((filtBtn) => {
 if (scheduleBtn) {
   scheduleBtn.addEventListener("click", () => {
     schedulePage.classList.add("show");
-
     closeMenu();
   });
 }
@@ -686,6 +740,7 @@ if (scheduleBtn) {
 if (feedbackBtn) {
   feedbackBtn.addEventListener("click", () => {
     feedbackPage.classList.add("show");
+    closeMenu();
   });
 }
 
@@ -1014,6 +1069,9 @@ function suggestCategory(itemName) {
 function openAddItemModal() {
   addItemModal.classList.add("show");
   closeFab();
+  // if (addItemModal) {homePage.style.transform = "scale(0.9)"}
+  // else {homePage.style.transform = "scale(1)"}
+  homePage.style.transform = "scale(0.98)";
 }
 
 // Close modal
@@ -1029,6 +1087,8 @@ function closeModal() {
   if (quantityInput) quantityInput.value = "1";
   if (priceInput) priceInput.value = "";
   if (categorySelect) categorySelect.value = "Food";
+
+  homePage.style.transform = "scale(1)";
 }
 
 if (cancelBtn) cancelBtn.addEventListener("click", closeModal);
@@ -1058,6 +1118,180 @@ if (increaseQty) {
     quantityInput.value = current + 1;
   });
 }
+
+const concurrentContainer = document.querySelector(
+  ".concurrent-items-container",
+);
+const concurrentItems = document.querySelectorAll(".concurrent-items-wrapper");
+
+concurrentContainer.addEventListener("click", (e) => {
+  e.stopPropagation();
+  concurrentContainer.classList.toggle("expand");
+
+  if (!concurrentContainer.classList.contains("expand")) {
+    concurrentItems.forEach((item) => {
+      item.classList.remove("expand");
+    });
+  }
+});
+concurrentItems.forEach((item) => {
+  item.addEventListener("click", (e) => {
+    e.stopPropagation();
+
+    if (!concurrentContainer.classList.contains("expand")) {
+      return;
+    }
+    const isExpanded = item.classList.contains("expand");
+
+    concurrentItems.forEach((otherItem) => {
+      otherItem.classList.remove("expand");
+      otherItem.style.transformOrigin = "";
+    });
+
+    if (!isExpanded) {
+      item.classList.add("expand");
+
+      // Get item position in container to set transform-origin
+      const itemRect = item.getBoundingClientRect();
+      const containerRect = concurrentContainer.getBoundingClientRect();
+      const relativeTop = itemRect.top - containerRect.top;
+      const relativeLeft = itemRect.left - containerRect.left;
+      const containerWidth = containerRect.width;
+      const containerHeight = containerRect.height;
+
+      // Determine vertical anchor point
+      /* let verticalOrigin = "center";
+      let horizontalOrigin = "centeright";
+      if (relativeTop < containerHeight * 0.33 && relativeLeft < containerWidth * 0.33) {
+        verticalOrigin = "top";
+        horizontalOrigin = "left";
+        item.style.backgroundColor = "red";
+      } else if (relativeTop < containerHeight * 0.33 && relativeLeft > containerWidth * 0.66) {
+        verticalOrigin = "top";
+        horizontalOrigin = "right";
+        item.style.marginRight = "36px";
+        item.style.backgroundColor = "yellow";
+      } else if (relativeTop > containerHeight * 0.66 && relativeLeft > containerWidth * 0.66) {
+        verticalOrigin = "bottom";
+        horizontalOrigin = "right";
+        item.style.marginRight = "36px";
+        item.style.backgroundColor = "violet";
+      } else if (relativeTop > containerHeight * 0.66 && relativeLeft < containerWidth * 0.66) {
+        verticalOrigin = "bottom";
+        horizontalOrigin = "left";
+        item.style.backgroundColor = "blue";
+      } else if (relativeTop > containerHeight * 0.66 && relativeLeft < containerWidth * 0.33) {
+        verticalOrigin = "bottom";
+        horizontalOrigin = "left";
+        item.style.backgroundColor = "brown";
+      } else if (relativeTop < containerHeight * 0.66 && relativeLeft < containerWidth * 0.33) {
+        verticalOrigin = "bottom";
+        horizontalOrigin = "left";
+        item.style.backgroundColor = "green";
+      } else if (relativeTop < containerHeight * 0.66 && relativeLeft > containerWidth * 0.33) {
+        verticalOrigin = "bottom";
+        horizontalOrigin = "right";
+        item.style.backgroundColor = "rgba(115, 230, 115)";
+      } else if (relativeTop > containerHeight * 0.66 && relativeLeft > containerWidth * 0.33) {
+        verticalOrigin = "bottom";
+        horizontalOrigin = "right";
+        item.style.backgroundColor = "rgba(115, 20, 115)";
+      }
+
+      item.style.transformOrigin = `${horizontalOrigin} ${verticalOrigin}`; */
+
+      let position = "";
+
+      switch (true) {
+        // TOP ROW (relatieTop < 3)
+        case relativeTop < containerHeight * 0.33 && relativeLeft < containerWidth * 0.66:
+          position = "isTopLeft";
+          break;
+        case relativeTop < containerHeight * 0.33 && relativeLeft > containerWidth * 0.33 && relativeLeft < containerWidth * 0.66:
+          position = "isTopCenter";
+          break;
+        case relativeTop < containerHeight * 0.33 && relativeLeft > containerWidth * 0.66:
+          position = "isTopRight";
+          break;
+
+        // MIDDLE ROW  (relativeTop between 3 and 6)
+        case relativeTop < containerHeight * 0.66 && relativeTop < containerHeight * 0.66 && relativeLeft < containerWidth * 0.33:
+          position = "isMiddleLeft";
+        case relativeTop > containerHeight * 0.33 &&
+          relativeTop < containerHeight * 0.66 &&
+          relativeLeft > containerWidth * 0.33 &&
+          relativeLeft < containerWidth * 0.66:
+          position = "isMiddleCenter";
+          break;
+        case relativeTop > containerHeight * 0.33 && relativeTop < containerHeight * 0.66 && relativeLeft > containerWidth * 0.66:
+          position = "isMiddleRight";
+          break;
+
+        // BOTTOM ROW (relativeTio > 6)
+        case relativeTop > containerHeight * 0.66 && relativeLeft < containerWidth * 0.33:
+          position = "isBottomLeft";
+          break;
+        case relativeTop > containerHeight * 0.66 && relativeLeft > containerWidth * 0.33 && relativeLeft < containerWidth * 0.66:
+          position = "isBottomCenter";
+          break;
+        case relativeTop > containerHeight * 0.66 && relativeLeft > containerWidth * 0.66:
+          position = "isBottomRight";
+          break;
+
+        default:
+          position = "unknown";
+      }
+
+      if (position === "isTopLeft") {
+        // item.style.backgroundColor = "red";
+        item.style.transformOrigin = "left top";
+      }
+      if (position === "isTopCenter") {
+        // item.style.backgroundColor = "yellow";
+      }
+      if (position === "isTopRight") {
+        // item.style.backgroundColor = "green";
+        item.style.transformOrigin = "right top";
+      }
+      if (position === "isMiddleLeft") {
+        // item.style.backgroundColor = " blue";
+      }
+      if (position === "isMiddleCenter") {
+        // item.style.backgroundColor = "orange";
+        item.style.transformOrigin = "left center";
+      }
+      if (position === "isMiddleRight") {
+        // item.style.backgroundColor = "greenyellow";
+        item.style.transformOrigin = "right center";
+      }
+      if (position === "isBottomLeft") {
+        // item.style.backgroundColor = "indigo";
+        item.style.transformOrigin = "left bottom";
+      }
+      if (position === "isBottomCenter") {
+        // item.style.backgroundColor = "gray";
+        item.style.transformOrigin = "center bottom";
+      }
+      if (position === "isBottomRight") {
+        // item.style.backgroundColor = "gold";
+        item.style.transformOrigin = "right bottom";
+      }
+
+      /* if (relativeLeft < containerWidth * 0.33) {
+        horizontalOrigin = "left";
+      } else if (relativeLeft > containerWidth * 0.66) {
+        horizontalOrigin = "right";
+      }
+      item.style.transformOrigin = `right ${verticalOrigin}`; */
+    }
+  });
+});
+document.addEventListener("click", () => {
+  concurrentContainer.classList.remove("expand");
+  concurrentItems.forEach((item) => {
+    item.classList.remove("expand");
+  });
+});
 
 function getCategoryNameFromHeader(header) {
   if (!header) return "";
@@ -2476,14 +2710,16 @@ Object.entries(profileActions).forEach(([id, handler]) => {
   document.getElementById(id)?.addEventListener("click", handler);
 });
 
-const text = document.querySelector(".text");
-const expandModal = document.querySelector(".expand-modal");
+const atPlaceBtn = document.querySelector(".at-place-btn");
+const atPlaceText = document.querySelector(".at-place-text");
+const atPlaceModal = document.querySelector(".at-place-modal");
 
-if (text && expandModal) {
-  text.addEventListener("click", () => {
-    expandModal.classList.toggle("expanded");
+if (atPlaceBtn) {
+  atPlaceBtn.addEventListener("click", () => {
+    atPlaceBtn.classList.toggle("expand");
   });
 }
+atPlaceText.innerText = "@" + "Home";
 
 // ===== TOGGLE SWITCHES FUNCTIONALITY =====
 // Dark Mode Toggle
@@ -2682,7 +2918,7 @@ function updateNotificationPage() {
             ${typeTitle}
           </div>
           <div class="notification-summary">
-          "Rice alone used over 10% of your budget. Check your insights to find more"
+          itemNameInput.value alone used over 10% of your budget. Check your insights to find more
           </div>
           <div class="time-container">
             <span class="notification-time">${timeAgo}</span>
