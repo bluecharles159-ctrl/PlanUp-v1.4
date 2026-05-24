@@ -28,15 +28,19 @@ const itemCount = document.getElementById("itemCount");
 
 let isScrolling;
 
-window.addEventListener('scroll', () => {
-  document.body.classList.add("show-scrollbar");
+window.addEventListener(
+  "scroll",
+  () => {
+    document.body.classList.add("show-scrollbar");
 
-  window.clearTimeout(isScrolling);
+    window.clearTimeout(isScrolling);
 
-  isScrolling = setTimeout(() => {
-    document.body.classList.remove("show-scrollbar");
-  }, 1200);
-}, {passive: true});
+    isScrolling = setTimeout(() => {
+      document.body.classList.remove("show-scrollbar");
+    }, 1200);
+  },
+  { passive: true },
+);
 
 // State variables
 let items = JSON.parse(localStorage.getItem("planup_items")) || [];
@@ -101,13 +105,17 @@ function updateAdminChart() {
     { label: "Items", value: adminMetrics.itemsAdded, color: "#9c27b0" },
   ];
 
+  // Find max value for scaling
+  const maxValue = Math.max(...chartData.map(item => item.value), 1);
+  const barHeightPercent = (value) => Math.max((value / maxValue) * 100, 10);
+
   chartGrid.innerHTML = chartData
     .map(
       (item) => `
         <div class="admin-chart-item">
-          <span class="admin-chart-label">${item.label}</span>
-          <div class="admin-chart-bar" style="width: ${Math.min(item.value * 12 + 20, 100)}%; background: ${item.color};"></div>
           <span class="admin-chart-value">${item.value}</span>
+          <div class="admin-chart-bar" style="height: ${barHeightPercent(item.value)}%; background: ${item.color};"></div>
+          <span class="admin-chart-label">${item.label}</span>
         </div>
       `,
     )
@@ -155,7 +163,7 @@ const notificationPage = document.getElementById("notificationPage");
 const favoritesPage = document.getElementById("favoritesPage");
 const historyPage = document.getElementById("historyPage");
 const dashboardPage = document.getElementById("dashboardPage");
-const schedulePage = document.getElementById("schedulePage");
+const scheduledPage = document.getElementById("scheduledPage");
 const feedbackPage = document.getElementById("feedbackPage");
 
 document.getElementById("navMyItems").onclick = () => {
@@ -246,7 +254,7 @@ if (rangeText) {
   });
 }
 
-function openRangeModal() {
+/* function openRangeModal() {
   rangeModal.innerHTML = "";
 
   const options =
@@ -267,15 +275,88 @@ function openRangeModal() {
   });
 
   rangeModal.classList.add("open");
+} */
+
+function openRangeModal() {
+  rangeModal.innerHTML = "";
+
+  const options =
+    currentPeriod === "month"
+      ? ["This month", "Last month", "Last 2 months", "Last 3 months"]
+      : ["This week", "Last week", "Last 2 weeks", "Last 3 weeks"];
+
+  options.forEach((opt) => {
+    const div = document.createElement("div");
+    div.className = "range-option";
+    div.textContent = opt;
+
+    // FIX: Clear layout and click states cleanly
+    div.addEventListener("click", (e) => {
+      e.stopPropagation(); // Prevents global listener conflicts
+      selectedRange = opt;
+      if (rangeText) rangeText.textContent = opt;
+      closeRangeModal();
+    });
+
+    rangeModal.appendChild(div);
+  });
+
+  // Position the modal directly under the rangeText control
+  if (rangeText) {
+    const rect = rangeText.getBoundingClientRect();
+    // Ensure modal is absolutely positioned so we can control exact placement
+    rangeModal.style.position = "absolute";
+    // Add small top offset so it appears below the text
+    const top = rect.bottom + window.scrollY + 6;
+    const left = rect.left + window.scrollX;
+    rangeModal.style.top = `${top}px`;
+    // Keep modal left-aligned with the range text, but ensure it doesn't overflow
+    rangeModal.style.left = `${Math.max(8, left)}px`;
+    // Optionally match width to the trigger
+    rangeModal.style.minWidth = `${Math.max(160, rect.width)}px`;
+  }
+
+  rangeModal.classList.add("open");
+
+  // Reposition on window resize/scroll to stay under the trigger
+  const reposition = () => {
+    if (!rangeModal.classList.contains("open") || !rangeText) return;
+    const r = rangeText.getBoundingClientRect();
+    rangeModal.style.top = `${r.bottom + window.scrollY + 6}px`;
+    rangeModal.style.left = `${Math.max(8, r.left + window.scrollX)}px`;
+  };
+  window.addEventListener("resize", reposition);
+  window.addEventListener("scroll", reposition, { passive: true });
 }
 
 function closeRangeModal() {
   if (rangeModal) rangeModal.classList.remove("open");
 }
 
+/* function getRangeStart(period, range) {
+  const now = new Date();
+
+  if (period === "week") {
+    if (range === "This week") now.setDate(now.getDate() - 7);
+    if (range === "Last week") now.setDate(now.getDate() - 14);
+    if (range === "Last 2 weeks") now.setDate(now.getDate() - 21);
+    if (range === "Last 3 weeks") now.setDate(now.getDate() - 28);
+  }
+
+  if (period === "month") {
+    if (range === "This month") now.setMonth(now.getMonth() - 1);
+    if (range === "Last month") now.setMonth(now.getMonth() - 2);
+    if (range === "Last 2 months") now.setMonth(now.getMonth() - 3);
+    if (range === "Last 3 months") now.setMonth(now.getMonth() - 4);
+  }
+
+  return now.getTime();
+} */
+
 function getRangeStart(period, range) {
   const now = new Date();
 
+  // FIX: Mutate dates correctly backward from today
   if (period === "week") {
     if (range === "This week") now.setDate(now.getDate() - 7);
     if (range === "Last week") now.setDate(now.getDate() - 14);
@@ -399,7 +480,7 @@ function renderInsightsChart() {
     const y = padding + index * rowHeight;
     const barWidth = Math.max(8, (item.quantity / maxQuantity) * barAreaWidth);
 
-    ctx.fillStyle = "#248700";
+    ctx.fillStyle = "#000000";
     ctx.fillRect(padding + labelWidth, y + 8, barWidth, rowHeight * 0.4);
 
     ctx.fillStyle = "#111";
@@ -425,8 +506,356 @@ function renderInsightsChart() {
   );
 }
 
-// let currentOption = "By used budget" ? "By used budget" : "By total budget";
-// let priceOption = ["By used budget", "By total budget"];
+// ===== FAVORITES MANAGEMENT =====
+const FAVORITES_STORAGE_KEY = "planup_favorites";
+
+function getFavorites() {
+  const stored = localStorage.getItem(FAVORITES_STORAGE_KEY);
+  return stored ? JSON.parse(stored) : { recipes: [], ingredients: [] };
+}
+
+function saveFavorites(favorites) {
+  localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favorites));
+  displayFavorites();
+}
+
+function getRecipeCategory(recipeName) {
+  const categories = {
+    pastry: ["cake", "pie", "tart", "croissant", "donut", "pastry", "bread", "biscuit", "cookie"],
+    snack: ["chips", "popcorn", "nuts", "trail mix", "snack", "appetizer", "dip"],
+    meat: ["chicken", "beef", "pork", "lamb", "turkey", "steak", "ribs", "ham", "sausage", "meatball"],
+    beverage: ["juice", "smoothie", "coffee", "tea", "shake", "drink", "cocktail", "wine", "beer", "latte"],
+    salad: ["salad", "slaw", "coleslaw", "greens"],
+    pudding: ["pudding", "mousse", "dessert", "tiramisu", "cheesecake", "brownie"],
+    seafood: ["fish", "salmon", "tuna", "shrimp", "crab", "lobster", "squid", "oyster", "seafood"],
+    pasta: ["pasta", "spaghetti", "lasagna", "noodle", "ravioli"],
+    soup: ["soup", "broth", "stew", "chowder", "bisque"],
+    vegetarian: ["tofu", "vegetable", "veggie", "vegan", "greens", "spinach", "kale"]
+  };
+  
+  const lowerName = recipeName.toLowerCase();
+  for (const [category, keywords] of Object.entries(categories)) {
+    if (keywords.some(keyword => lowerName.includes(keyword))) {
+      return category;
+    }
+  }
+  return "meal";
+}
+
+function getRecipeImage(recipeName, category) {
+  const images = {
+    pastry: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=200&h=200&fit=crop",
+    snack: "https://images.unsplash.com/photo-1599599810694-b5ac4dd64b73?w=200&h=200&fit=crop",
+    meat: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop",
+    beverage: "https://images.unsplash.com/photo-1461023058943-07fcbe16d735?w=200&h=200&fit=crop",
+    salad: "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=200&h=200&fit=crop",
+    pudding: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=200&h=200&fit=crop",
+    seafood: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=200&h=200&fit=crop",
+    pasta: "https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=200&h=200&fit=crop",
+    soup: "https://images.unsplash.com/photo-1547069900-7f62f0e71cb9?w=200&h=200&fit=crop",
+    vegetarian: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=200&h=200&fit=crop",
+    meal: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop"
+  };
+  return images[category] || images.meal;
+}
+
+function addFavorite(type, name, origin = "") {
+  const favorites = getFavorites();
+  const category = type === "recipe" ? getRecipeCategory(name) : "";
+  const image = type === "recipe" ? getRecipeImage(name, category) : "";
+  const item = { name: name.trim(), origin: origin.trim(), category, image, id: `${type}-${name}-${origin}` };
+  
+  if (type === "recipe") {
+    if (!favorites.recipes.find(r => r.id === item.id)) {
+      favorites.recipes.push(item);
+      saveFavorites(favorites);
+      return true;
+    }
+  } else if (type === "ingredient") {
+    if (!favorites.ingredients.find(i => i.id === item.id)) {
+      favorites.ingredients.push(item);
+      saveFavorites(favorites);
+      return true;
+    }
+  }
+  return false;
+}
+
+function removeFavorite(type, name, origin = "") {
+  const favorites = getFavorites();
+  const itemId = `${type}-${name}-${origin}`;
+  
+  if (type === "recipe") {
+    favorites.recipes = favorites.recipes.filter(r => r.id !== itemId);
+  } else if (type === "ingredient") {
+    favorites.ingredients = favorites.ingredients.filter(i => i.id !== itemId);
+  }
+  
+  saveFavorites(favorites);
+  return true;
+}
+
+function isFavorite(type, name, origin = "") {
+  const favorites = getFavorites();
+  const itemId = `${type}-${name}-${origin}`;
+  
+  if (type === "recipe") {
+    return favorites.recipes.some(r => r.id === itemId);
+  } else if (type === "ingredient") {
+    return favorites.ingredients.some(i => i.id === itemId);
+  }
+  return false;
+}
+
+function displayFavorites() {
+  const favorites = getFavorites();
+  const favRecipesContainer = document.querySelector(".fav-recipes");
+  const favIngredientsContainer = document.querySelector(".fav-ingredients");
+  
+  if (favRecipesContainer) {
+    favRecipesContainer.innerHTML = "";
+    if (favorites.recipes.length === 0) {
+      favRecipesContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #999;">No favourite recipes yet</div>';
+    } else {
+      favorites.recipes.forEach(recipe => {
+        const recipeEl = createFavRecipeElement(recipe);
+        favRecipesContainer.appendChild(recipeEl);
+      });
+    }
+  }
+  
+  if (favIngredientsContainer) {
+    favIngredientsContainer.innerHTML = "";
+    if (favorites.ingredients.length === 0) {
+      favIngredientsContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #999;">No favourite ingredients yet</div>';
+    } else {
+      favorites.ingredients.forEach(ingredient => {
+        const ingredientEl = createFavIngredientElement(ingredient);
+        favIngredientsContainer.appendChild(ingredientEl);
+      });
+    }
+  }
+}
+
+function createFavRecipeElement(recipe) {
+  const div = document.createElement("div");
+  div.className = "fav-recipe-item";
+  div.setAttribute("data-name", recipe.name);
+  div.setAttribute("data-origin", recipe.origin);
+  const imageUrl = recipe.image || getRecipeImage(recipe.name, recipe.category || "meal");
+  const categoryDisplay = recipe.category ? recipe.category.charAt(0).toUpperCase() + recipe.category.slice(1) : "Meal";
+  
+  div.innerHTML = `
+    <div class="fav-recipe-image-container">
+      <img src="${imageUrl}" alt="${recipe.name}" class="fav-recipe-image" onerror="this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop'">
+      <div class="fav-recipe-blur-bg"></div>
+    </div>
+    <div class="fav-recipe-content">
+      <div class="fav-recipe-name">${recipe.name}</div>
+      <div class="fav-recipe-meta">
+        <span class="fav-recipe-category">${categoryDisplay}</span>
+        <span class="fav-recipe-origin">${recipe.origin}</span>
+      </div>
+    </div>
+    <div class="fav-recipe-heart like-item liked" data-type="recipe" data-name="${recipe.name}" data-origin="${recipe.origin}">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24">
+        <path fill="currentColor"
+          d="m8.962 18.91l.464-.588zM12 5.5l-.54.52a.75.75 0 0 0 1.08 0zm3.038 13.41l.465.59zm-5.612-.588C7.91 17.127 6.253 15.96 4.938 14.48C3.65 13.028 2.75 11.335 2.75 9.137h-1.5c0 2.666 1.11 4.7 2.567 6.339c1.43 1.61 3.254 2.9 4.68 4.024zM2.75 9.137c0-2.15 1.215-3.954 2.874-4.713c1.612-.737 3.778-.541 5.836 1.597l1.08-1.04C10.1 2.444 7.264 2.025 5 3.06C2.786 4.073 1.25 6.425 1.25 9.137zM8.497 19.5c.513.404 1.063.834 1.62 1.16s1.193.59 1.883.59v-1.5c-.31 0-.674-.12-1.126-.385c-.453-.264-.922-.628-1.448-1.043zm7.006 0c1.426-1.125 3.25-2.413 4.68-4.024c1.457-1.64 2.567-3.673 2.567-6.339h-1.5c0 2.198-.9 3.891-2.188 5.343c-1.315 1.48-2.972 2.647-4.488 3.842zM22.75 9.137c0-2.712-1.535-5.064-3.75-6.077c-2.264-1.035-5.098-.616-7.54 1.92l1.08 1.04c2.058-2.137 4.224-2.333 5.836-1.596c1.659.759 2.874 2.562 2.874 4.713zm-8.176 9.185c-.526.415-.995.779-1.448 1.043s-.816.385-1.126.385v1.5c.69 0 1.326-.265 1.883-.59c.558-.326 1.107-.756 1.62-1.16z" />
+      </svg>
+    </div>
+  `;
+  return div;
+}
+
+function createFavIngredientElement(ingredient) {
+  const div = document.createElement("div");
+  div.className = "ingredient-item";
+  div.innerHTML = `
+    <div class="ingredient-name-qty">${ingredient.name}</div>
+    <div class="like-item liked" data-type="ingredient" data-name="${ingredient.name}" data-origin="${ingredient.origin}">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+        <path fill="currentColor"
+          d="m8.962 18.91l.464-.588zM12 5.5l-.54.52a.75.75 0 0 0 1.08 0zm3.038 13.41l.465.59zm-5.612-.588C7.91 17.127 6.253 15.96 4.938 14.48C3.65 13.028 2.75 11.335 2.75 9.137h-1.5c0 2.666 1.11 4.7 2.567 6.339c1.43 1.61 3.254 2.9 4.68 4.024zM2.75 9.137c0-2.15 1.215-3.954 2.874-4.713c1.612-.737 3.778-.541 5.836 1.597l1.08-1.04C10.1 2.444 7.264 2.025 5 3.06C2.786 4.073 1.25 6.425 1.25 9.137zM8.497 19.5c.513.404 1.063.834 1.62 1.16s1.193.59 1.883.59v-1.5c-.31 0-.674-.12-1.126-.385c-.453-.264-.922-.628-1.448-1.043zm7.006 0c1.426-1.125 3.25-2.413 4.68-4.024c1.457-1.64 2.567-3.673 2.567-6.339h-1.5c0 2.198-.9 3.891-2.188 5.343c-1.315 1.48-2.972 2.647-4.488 3.842zM22.75 9.137c0-2.712-1.535-5.064-3.75-6.077c-2.264-1.035-5.098-.616-7.54 1.92l1.08 1.04c2.058-2.137 4.224-2.333 5.836-1.596c1.659.759 2.874 2.562 2.874 4.713zm-8.176 9.185c-.526.415-.995.779-1.448 1.043s-.816.385-1.126.385v1.5c.69 0 1.326-.265 1.883-.59c.558-.326 1.107-.756 1.62-1.16z" />
+      </svg>
+    </div>
+  `;
+  return div;
+}
+
+// ===== UPDATE LIKE BUTTON STATES =====
+function updateLikeButtonStates() {
+  const likeButtons = document.querySelectorAll(".like-item:not(.in-favorites)");
+  
+  likeButtons.forEach((btn) => {
+    const recipeItem = btn.closest(".recipe-item");
+    const mealName = recipeItem?.querySelector(".meal-name");
+    const placeOfRecipe = recipeItem?.querySelector(".place-of-recipe");
+    
+    if (!mealName) return;
+    
+    const name = mealName.textContent.split('\n')[0].trim();
+    const origin = placeOfRecipe ? placeOfRecipe.textContent.trim() : "";
+    
+    if (isFavorite("recipe", name, origin)) {
+      btn.classList.add("liked");
+    } else {
+      btn.classList.remove("liked");
+    }
+  });
+}
+
+// ===== INITIALIZE LIKE BUTTONS =====
+function initializeLikeButtons() {
+  const likeButtons = document.querySelectorAll(".like-item");
+  
+  likeButtons.forEach((heart) => {
+    // Skip if already initialized
+    if (heart.dataset.initialized === "true") return;
+    heart.dataset.initialized = "true";
+    
+    heart.addEventListener("click", (e) => {
+      e.stopPropagation();
+      
+      // Get item information from the parent structure
+      const recipeItem = heart.closest(".recipe-item");
+      const mealName = recipeItem?.querySelector(".meal-name");
+      const placeOfRecipe = recipeItem?.querySelector(".place-of-recipe");
+      
+      if (!mealName) return;
+      
+      const name = mealName.textContent.split('\n')[0].trim();
+      const origin = placeOfRecipe ? placeOfRecipe.textContent.trim() : "";
+      
+      heart.classList.toggle("liked");
+      
+      if (heart.classList.contains("liked")) {
+        addFavorite("recipe", name, origin);
+        showToast(`✓ ${name} added to favorites`);
+      } else {
+        removeFavorite("recipe", name, origin);
+        showToast(`✕ ${name} removed from favorites`);
+      }
+    });
+  });
+  
+  // Handle like buttons in favorites containers with event delegation
+  const favRecipesContainer = document.querySelector(".fav-recipes");
+  const favIngredientsContainer = document.querySelector(".fav-ingredients");
+  
+  if (favRecipesContainer) {
+    favRecipesContainer.addEventListener("click", (e) => {
+      const likeBtn = e.target.closest(".fav-recipe-heart, .like-item");
+      if (!likeBtn) return;
+      
+      e.stopPropagation();
+      const recipeItem = likeBtn.closest(".fav-recipe-item, .recipe-item");
+      
+      if (!recipeItem) return;
+      
+      let name, origin;
+      
+      // Handle new thin recipe format
+      if (recipeItem.classList.contains("fav-recipe-item")) {
+        name = recipeItem.getAttribute("data-name");
+        origin = recipeItem.getAttribute("data-origin") || "";
+      } else {
+        // Handle old format
+        const mealName = recipeItem.querySelector(".meal-name");
+        if (!mealName) return;
+        name = mealName.textContent.split('\n')[0].trim();
+        origin = recipeItem.querySelector(".place-of-recipe")?.textContent.trim() || "";
+      }
+      
+      if (!name) return;
+      removeFavorite("recipe", name, origin);
+      showToast(`✕ ${name} removed from favorites`);
+    });
+  }
+  
+  if (favIngredientsContainer) {
+    favIngredientsContainer.addEventListener("click", (e) => {
+      const likeBtn = e.target.closest(".like-item");
+      if (!likeBtn) return;
+      
+      e.stopPropagation();
+      const ingredientName = likeBtn.previousElementSibling?.textContent.trim();
+      
+      if (!ingredientName) return;
+      
+      removeFavorite("ingredient", ingredientName, "");
+      showToast("✕ Removed from favorites");
+    });
+  }
+}
+
+function setupInsightRecipeFavorites() {
+  const insightsRecipeSection = insightsPage?.querySelector(".item-recipe-details");
+  if (!insightsRecipeSection) return;
+
+  insightsRecipeSection.addEventListener("click", (e) => {
+    const recipeItem = e.target.closest(".recipe-item");
+    if (!recipeItem) return;
+    if (e.target.closest(".like-item") || e.target.closest(".expand-item")) return;
+
+    const mealName = recipeItem.querySelector(".meal-name");
+    const placeOfRecipe = recipeItem.querySelector(".place-of-recipe");
+    if (!mealName) return;
+
+    const name = mealName.textContent.split("\n")[0].trim();
+    const origin = placeOfRecipe ? placeOfRecipe.textContent.trim() : "";
+    if (!name) return;
+
+    const wasAdded = addFavorite("recipe", name, origin);
+    if (wasAdded) {
+      showToast("✓ Recipe added to favorites");
+      updateLikeButtonStates();
+    }
+  });
+}
+
+const recipeItem = document.querySelectorAll(".recipe-item");
+
+const expandRecipe = document.querySelectorAll(".expand-item");
+
+/* expandRecipe.forEach(arrow => {
+  arrow.addEventListener("click", () => {
+    recipeItem.classList.toggle("expand");
+  })
+}) */
+
+/* expandRecipe.forEach(arrow => {
+  arrow.addEventListener("click", () => {
+    
+    recipeItem.forEach(recipe => {
+      recipe.forEach(allRecipe => {
+        allRecipe.classList.remove("expand");
+      })
+      recipe.classList.toggle("expand");
+    })
+  })
+}) */
+
+/* const expandRecipe = document.querySelectorAll(".expand-item");
+expandRecipe.forEach((arrow) => {
+  recipeItem.forEach((recipe) => {
+    arrow.addEventListener("click", () => {
+      recipe.classList.toggle("expand");
+    });
+  });
+}); */
+
+/* recipeItem.forEach((recipe) => {
+  expandRecipe.forEach((arrow) => {
+    arrow.addEventListener("click", () => {
+      recipe.classList.toggle("expand");
+    });
+  });
+}); */
+recipeItem.forEach((recipe) => {
+  recipe.addEventListener("click", () => {
+    recipe.classList.toggle("expand");
+  });
+});
 
 //Profile Page
 document.getElementById("navProfiles").onclick = () => {
@@ -513,21 +942,189 @@ settingsBtn.addEventListener("click", () => {
 
 const currencyDiv = document.querySelector(".currency-div");
 const currencyOverlay = document.querySelector(".currency-overlay");
+const currencyModal = document.querySelector(".currency-selector-div");
 
 currencyDiv.addEventListener("click", () => {
+  currencyModal.classList.add("show");
   currencyOverlay.classList.add("show");
+  profilePage.style.transform = "scale(1.01)";
 });
 currencyOverlay.addEventListener("click", (e) => {
   e.stopPropagation();
+  currencyModal.classList.remove("show");
   currencyOverlay.classList.remove("show");
+  profilePage.style.transform = "scale(1)";
 });
 
-const deleteAction = document.getElementById("deleteAction");
+const currencyOptions = document.querySelectorAll(".currency-div-select");
+let selectedCurrency = "";
+let currencySymbol = "";
+
+currencyOptions.forEach((option) => {
+  option.addEventListener("click", (e) => {
+    e.stopPropagation();
+    selectedCurrency =
+      option.innerHTML.trim().charAt(6) + " " + option.innerHTML;
+    let charArr = [...selectedCurrency];
+    charArr.splice(5);
+    const finalCurrency =
+      charArr[0] + charArr[1] + charArr[2] + charArr[3] + charArr[4];
+    selectedCurrency = finalCurrency;
+    currencyDiv.innerHTML = selectedCurrency;
+    selectedCurrency = "";
+    currencyModal.classList.remove("show");
+    currencyOverlay.classList.remove("show");
+    profilePage.style.transform = "scale(1)";
+  });
+});
+
+const deleteActions = document.querySelectorAll("#deleteAction");
 const deletePanel = document.getElementById("deletePanel");
 
-deleteAction.addEventListener("click", () => {
-  deletePanel.classList.add("show");
-});
+// Attach handler to all delete action buttons (some pages may duplicate the id)
+if (deleteActions && deleteActions.length) {
+  deleteActions.forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      showDeletePanel();
+    });
+  });
+}
+
+// Create and manage a modal overlay for delete confirmation
+let _deleteOverlay = null;
+function ensureDeleteOverlay() {
+  if (_deleteOverlay) return _deleteOverlay;
+  _deleteOverlay = document.createElement("div");
+  _deleteOverlay.className = "delete-overlay";
+  // Ensure overlay is visible even without CSS
+  Object.assign(_deleteOverlay.style, {
+    position: "fixed",
+    top: "0",
+    left: "0",
+    right: "0",
+    bottom: "0",
+    background: "rgba(0,0,0,0.45)",
+    zIndex: "9997",
+    display: "none",
+    opacity: "0",
+    transition: "opacity 180ms ease-in-out",
+  });
+  document.body.appendChild(_deleteOverlay);
+  _deleteOverlay.addEventListener("click", () => {
+    closeDeletePanel();
+  });
+  return _deleteOverlay;
+}
+
+function showDeletePanel() {
+  // Close settings page if open
+  if (settingsPage) settingsPage.classList.remove("show");
+  // Ensure overlay exists and show
+  ensureDeleteOverlay();
+  // show overlay (inline styles) - set z-index higher than overlay
+  if (_deleteOverlay) {
+    _deleteOverlay.style.display = "block";
+    _deleteOverlay.style.zIndex = "9997";
+    setTimeout(() => (_deleteOverlay.style.opacity = "1"), 20);
+  }
+
+  if (deletePanel) {
+    deletePanel.classList.add("show");
+    // Ensure panel is on top of overlay
+    deletePanel.style.position = "relative";
+    deletePanel.style.zIndex = "9999";
+  }
+
+  // Find confirm button and attach input creation to button click
+  const confirmBtn = document.getElementById("confirmDeleteAction");
+  if (confirmBtn) {
+    confirmBtn.disabled = true;
+    
+    // Only show input when user clicks to delete
+    const onDeleteClick = () => {
+      // Create input if it doesn't exist yet
+      let input = deletePanel.querySelector("#confirmDeleteInput");
+      if (!input) {
+        input = document.createElement("input");
+        input.id = "confirmDeleteInput";
+        input.placeholder = 'Type "clear" to enable deletion';
+        input.className = "confirm-delete-input";
+        input.style.marginBottom = "10px";
+        const instructions = document.createElement("div");
+        instructions.className = "confirm-delete-instructions";
+        instructions.textContent = 'Type "clear" (without quotes) to confirm clearing all data.';
+        instructions.style.marginBottom = "10px";
+        instructions.style.fontSize = "12px";
+        // Insert above the confirm button
+        confirmBtn.parentNode.insertBefore(instructions, confirmBtn);
+        confirmBtn.parentNode.insertBefore(input, confirmBtn);
+
+        // Attach input listener for case-sensitive 'clear'
+        const onInput = (e) => {
+          const val = e.target.value.trim();
+          confirmBtn.disabled = val !== "clear";
+        };
+        input._deleteInputListener = onInput;
+        input.addEventListener("input", onInput);
+      }
+      // Focus the input
+      input.focus();
+    };
+
+    confirmBtn.removeEventListener("click", confirmBtn._deleteClickListener || (() => {}));
+    confirmBtn._deleteClickListener = onDeleteClick;
+    // First click shows the input
+    confirmBtn.addEventListener("click", onDeleteClick);
+
+    // Confirm action clears localStorage and reloads
+    const onConfirm = () => {
+      // Only proceed if enabled
+      if (confirmBtn.disabled) return;
+      // Clear all local storage and reload
+      localStorage.clear();
+      showToast("All data cleared.");
+      // Close overlays and reload after short delay
+      closeDeletePanel();
+      setTimeout(() => location.reload(), 300);
+    };
+
+    // Override the click handler to check if input exists and is valid
+    confirmBtn.onclick = (e) => {
+      const input = deletePanel.querySelector("#confirmDeleteInput");
+      if (!input) {
+        // Input doesn't exist, show it
+        onDeleteClick();
+        e.preventDefault();
+      } else if (input.value.trim() === "clear") {
+        // Input exists and is correct, confirm the action
+        onConfirm();
+      }
+    };
+  }
+}
+
+function closeDeletePanel() {
+  if (deletePanel) deletePanel.classList.remove("show");
+  if (_deleteOverlay) {
+    _deleteOverlay.style.opacity = "0";
+    setTimeout(() => {
+      _deleteOverlay.style.display = "none";
+    }, 200);
+  }
+  // cleanup input state and remove it so it appears fresh next time
+  const input = deletePanel?.querySelector("#confirmDeleteInput");
+  const instructions = deletePanel?.querySelector(".confirm-delete-instructions");
+  if (input) {
+    input.value = "";
+    input.remove();
+  }
+  if (instructions) {
+    instructions.remove();
+  }
+  const confirmBtn = document.getElementById("confirmDeleteAction");
+  if (confirmBtn) confirmBtn.disabled = true;
+}
 
 const faqBox = document.querySelector(".faqs-box");
 const faqNAnsWrapper = document.querySelector(".faq-n-ans-wrapper");
@@ -592,7 +1189,7 @@ const cancelAction = document.getElementById("cancelAction");
 const confirmDeleteAction = document.getElementById("confirmDeleteAction");
 
 cancelAction.addEventListener("click", () => {
-  deletePanel.classList.remove("show");
+  closeDeletePanel();
 });
 
 // ===== MENU =====
@@ -622,13 +1219,17 @@ function closePage() {
   if (notificationPage) notificationPage.classList.remove("show");
   if (toGetListPage) toGetListPage.classList.remove("show");
   if (favoritesPage) favoritesPage.classList.remove("show");
-  if (schedulePage) schedulePage.classList.remove("show");
+  if (scheduledPage) scheduledPage.classList.remove("show");
   if (historyPage) historyPage.classList.remove("show");
   if (recipePage) recipePage.classList.remove("show");
   if (feedbackPage) feedbackPage.classList.remove("show");
   if (settingsPage) settingsPage.classList.remove("show");
+  if (makeRecipePage) makeRecipePage.classList.remove("show");
   menuPage.classList.remove("show");
   menuOverlay.classList.remove("show");
+  if (typeof closeToGetModal === "function") {
+    closeToGetModal();
+  }
 }
 
 backFromPage.forEach((arrow) => {
@@ -640,13 +1241,285 @@ const toGetListBtn = document.getElementById("toGetListBtn");
 const favoritesBtn = document.getElementById("favoritesBtn");
 const historyBtn = document.getElementById("historyBtn");
 const dashboardBtn = document.getElementById("dashboardBtn");
-const scheduleBtn = document.getElementById("scheduleBtn");
+const scheduledBtn = document.getElementById("scheduledBtn");
 
 const addToGet = document.getElementById("addToGet");
-addToGet.addEventListener("click", () => {
-  closePage();
-  openRecipePage();
+const addToGetModal = document.getElementById("addToGetModal");
+const toGetModalOverlay = document.getElementById("toGetModalOverlay");
+const addToGetBtn = document.getElementById("addToGetBtn");
+const addFromRecipeBtn = document.querySelector("#addFromRecipeBtn");
+const toGetItemName = document.querySelector("#toGetItemName");
+const toGetItemQty = document.querySelector("#toGetItemQty");
+const toGetItemPrice = document.querySelector("#toGetItemPrice");
+const toGetItemStore = document.querySelector("#toGetItemStore");
+const TO_GET_STORAGE_KEY = "planup_to_get_items";
+let editingToGetItemId = null;
+
+if (addToGet) {
+  addToGet.addEventListener("click", () => {
+    editingToGetItemId = null;
+    addToGetModal?.classList.add("show");
+    toGetModalOverlay?.classList.add("show");
+    if (toGetListPage) toGetListPage.style.transform = "scale(1.01)";
+  });
+}
+function closeToGetModal() {
+  editingToGetItemId = null;
+  addToGetModal?.classList.remove("show");
+  toGetModalOverlay?.classList.remove("show");
+  if (toGetListPage) toGetListPage.style.transform = "scale(1)";
+}
+if (toGetModalOverlay) {
+  toGetModalOverlay.addEventListener("click", closeToGetModal);
+}
+
+function getToGetItems() {
+  const stored = localStorage.getItem(TO_GET_STORAGE_KEY);
+  return stored ? JSON.parse(stored) : [];
+}
+
+function saveToGetItems(items) {
+  localStorage.setItem(TO_GET_STORAGE_KEY, JSON.stringify(items));
+}
+
+function clearToGetModalFields() {
+  if (toGetItemName) toGetItemName.value = "";
+  if (toGetItemQty) toGetItemQty.value = "";
+  if (toGetItemPrice) toGetItemPrice.value = "";
+  if (toGetItemStore) toGetItemStore.value = "";
+}
+
+function createToGetItemElement(item) {
+  const div = document.createElement("div");
+  div.className = "to-get-item-card";
+  div.dataset.itemId = item.id;
+  div.innerHTML = `
+    <div class="to-get-item-icon">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M18 8h1a3 3 0 0 1 0 6h-1v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8h12Zm-2 7h1a1 1 0 0 0 0-2h-1v2Zm-8-9V4h8v2H8Zm-2 0H4V4a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v4H6Zm2 0h8V6H10v2Z"/></svg>
+    </div>
+    <div class="to-get-item-details">
+      <div class="to-get-item-name">${item.name}</div>
+      <div class="to-get-item-meta">
+        <span>${item.qty ? `Qty: ${item.qty}` : ""}</span>
+        <span>${item.price ? `Price: $${item.price}` : ""}</span>
+        <span>${item.store ? item.store : ""}</span>
+      </div>
+      <div class="to-get-item-actions">
+        <input type="checkbox" id="toGetItemChecker">
+        <div class="to-get-item-options" title="More options">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path fill="currentColor" d="M12 7a2 2 0 1 0 0-4a2 2 0 0 0 0 4Zm0 6a2 2 0 1 0 0-4a2 2 0 0 0 0 4Zm0 6a2 2 0 1 0 0-4a2 2 0 0 0 0 4Z"/></svg>
+        </div>
+      </div>
+    </div>
+  `;
+  return div;
+}
+
+const toGetItemModal = document.querySelector(".to-get-item-modal");
+const toGetItemModalOptions = document.querySelectorAll(".to-get-item-modal-option");
+
+function openToGetItemModal(card) {
+  if (!toGetItemModal || !card) return;
+  toGetItemModal.dataset.itemId = card.dataset.itemId || "";
+  toGetItemModal.classList.add("show");
+}
+
+function closeToGetItemModal() {
+  if (!toGetItemModal) return;
+  toGetItemModal.classList.remove("show");
+  delete toGetItemModal.dataset.itemId;
+}
+
+toGetItemModalOptions.forEach((option) => {
+  option.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const action = option.textContent.trim();
+    const itemId = toGetItemModal.dataset.itemId;
+    const items = getToGetItems();
+    const itemIndex = items.findIndex((item) => String(item.id) === String(itemId));
+
+    if (action === "Remove" && itemIndex !== -1) {
+      items.splice(itemIndex, 1);
+      saveToGetItems(items);
+      renderToGetItems();
+      showToast("Item removed from your to-get list.");
+    }
+
+    if (action === "Edit" && itemIndex !== -1) {
+      const item = items[itemIndex];
+      editingToGetItemId = item.id;
+      if (toGetItemName) toGetItemName.value = item.name || "";
+      if (toGetItemQty) toGetItemQty.value = item.qty || "";
+      if (toGetItemPrice) toGetItemPrice.value = item.price || "";
+      if (toGetItemStore) toGetItemStore.value = item.store || "";
+      addToGetModal?.classList.add("show");
+      toGetModalOverlay?.classList.add("show");
+      if (toGetListPage) toGetListPage.style.transform = "scale(1.01)";
+      showToast("Edit the item and save changes.");
+    }
+
+    if (action === "Add to item list" && itemIndex !== -1) {
+      const item = items[itemIndex];
+      const mainItem = {
+        id: Date.now(),
+        name: item.name,
+        quantity: item.qty ? Number(item.qty) : 1,
+        price: item.price ? parseFloat(item.price) || 0 : 0,
+        store: item.store || "",
+        createdAt: new Date().toISOString(),
+        category: "Misc",
+      };
+      const mainItems = JSON.parse(localStorage.getItem("planup_items")) || [];
+      mainItems.push(mainItem);
+      localStorage.setItem("planup_items", JSON.stringify(mainItems));
+      showToast("Item added to main list.");
+    }
+
+    if (action === "Set reminder") {
+      showToast("Reminder feature is coming soon.");
+    }
+
+    closeToGetItemModal();
+  });
 });
+
+function renderToGetItems() {
+  let container = document.querySelector(".to-get-items");
+  const pageContent = toGetListPage?.querySelector(".full-page-content");
+  const emptyCard = pageContent?.querySelector(".notification-empty .empty-page-card");
+
+  if (!container && pageContent) {
+    container = document.createElement("div");
+    container.className = "to-get-items";
+    pageContent.appendChild(container);
+  }
+
+  const items = getToGetItems();
+  if (container) {
+    container.innerHTML = "";
+    if (items.length === 0) {
+      if (emptyCard) emptyCard.style.display = "block";
+      container.style.display = "none";
+    } else {
+      if (emptyCard) emptyCard.style.display = "none";
+      items.forEach((item) => {
+        container.appendChild(createToGetItemElement(item));
+      });
+      container.style.display = "flex";
+    }
+  }
+
+  const optionButtons = document.querySelectorAll(".to-get-item-options");
+  optionButtons.forEach((button) => {
+    button.onclick = (event) => {
+      event.stopPropagation();
+      const card = button.closest(".to-get-item-card");
+      openToGetItemModal(card);
+    };
+  });
+}
+
+if (document) {
+  document.addEventListener("click", (event) => {
+    if (
+      toGetItemModal &&
+      toGetItemModal.classList.contains("show") &&
+      !event.target.closest(".to-get-item-modal") &&
+      !event.target.closest(".to-get-item-options")
+    ) {
+      closeToGetItemModal();
+    }
+  });
+}
+
+if (addToGetBtn) {
+  addToGetBtn.addEventListener("click", () => {
+    const name = toGetItemName?.value.trim() || "";
+    const qty = toGetItemQty?.value.trim();
+    const price = toGetItemPrice?.value.trim();
+    const store = toGetItemStore?.value.trim();
+
+    if (!name) {
+      showToast("Please enter an item name.");
+      return;
+    }
+
+    const items = getToGetItems();
+    if (editingToGetItemId) {
+      const editIndex = items.findIndex(
+        (item) => String(item.id) === String(editingToGetItemId),
+      );
+      if (editIndex !== -1) {
+        items[editIndex] = {
+          ...items[editIndex],
+          name,
+          qty,
+          price,
+          store,
+          updatedAt: new Date().toISOString(),
+        };
+        showToast("Item updated in your to-get list.");
+      }
+    } else {
+      items.push({
+        id: Date.now(),
+        name,
+        qty,
+        price,
+        store,
+        createdAt: new Date().toISOString(),
+      });
+      showToast("Item added to your to-get list.");
+    }
+
+    saveToGetItems(items);
+    renderToGetItems();
+    closeToGetModal();
+    clearToGetModalFields();
+  });
+}
+
+if (addFromRecipeBtn) {
+  addFromRecipeBtn.addEventListener("click", () => {
+    closeToGetModal();
+    closePage();
+    if (typeof openRecipePage === "function") {
+      openRecipePage();
+    } else {
+      console.error("openRecipePage is not defined.");
+    }
+    console.log("Navigating to recipe page from to-get list");
+  });
+}
+
+/*  addFromRecipeBtn.addEventListener("click", () => {
+   closeModal(); // Hide modal so back button works again
+   
+   // Ensure these two functions are actually defined in your script!
+   if (typeof closePage === "function" && typeof openRecipePage === "function") {
+     closePage();
+     openRecipePage();
+   } else {
+     console.error("closePage or openRecipePage is not defined.");
+   }
+ }); */
+
+const addIngredient = document.querySelectorAll(".add-ingredient");
+
+addIngredient.forEach(add => {
+  add.addEventListener("click", (e) => {
+    e.stopPropagation();
+
+  })
+})
+
+const prepareRecipeButton = document.getElementById("prepareRecipeButton");
+const makeRecipePage = document.getElementById("makeRecipePage");
+
+prepareRecipeButton.addEventListener("click", (e) => {
+  e.stopPropagation();
+  makeRecipePage.classList.add("show");
+})
 
 function closeMenu() {
   menuPage.classList.remove("show");
@@ -730,9 +1603,9 @@ favFiltBtn.forEach((filtBtn) => {
   });
 });
 
-if (scheduleBtn) {
-  scheduleBtn.addEventListener("click", () => {
-    schedulePage.classList.add("show");
+if (scheduledBtn) {
+  scheduledBtn.addEventListener("click", () => {
+    scheduledPage.classList.add("show");
     closeMenu();
   });
 }
@@ -1204,18 +2077,24 @@ concurrentItems.forEach((item) => {
 
       switch (true) {
         // TOP ROW (relatieTop < 3)
-        case relativeTop < containerHeight * 0.33 && relativeLeft < containerWidth * 0.66:
+        case relativeTop < containerHeight * 0.33 &&
+          relativeLeft < containerWidth * 0.66:
           position = "isTopLeft";
           break;
-        case relativeTop < containerHeight * 0.33 && relativeLeft > containerWidth * 0.33 && relativeLeft < containerWidth * 0.66:
+        case relativeTop < containerHeight * 0.33 &&
+          relativeLeft > containerWidth * 0.33 &&
+          relativeLeft < containerWidth * 0.66:
           position = "isTopCenter";
           break;
-        case relativeTop < containerHeight * 0.33 && relativeLeft > containerWidth * 0.66:
+        case relativeTop < containerHeight * 0.33 &&
+          relativeLeft > containerWidth * 0.66:
           position = "isTopRight";
           break;
 
         // MIDDLE ROW  (relativeTop between 3 and 6)
-        case relativeTop < containerHeight * 0.66 && relativeTop < containerHeight * 0.66 && relativeLeft < containerWidth * 0.33:
+        case relativeTop < containerHeight * 0.66 &&
+          relativeTop < containerHeight * 0.66 &&
+          relativeLeft < containerWidth * 0.33:
           position = "isMiddleLeft";
         case relativeTop > containerHeight * 0.33 &&
           relativeTop < containerHeight * 0.66 &&
@@ -1223,18 +2102,24 @@ concurrentItems.forEach((item) => {
           relativeLeft < containerWidth * 0.66:
           position = "isMiddleCenter";
           break;
-        case relativeTop > containerHeight * 0.33 && relativeTop < containerHeight * 0.66 && relativeLeft > containerWidth * 0.66:
+        case relativeTop > containerHeight * 0.33 &&
+          relativeTop < containerHeight * 0.66 &&
+          relativeLeft > containerWidth * 0.66:
           position = "isMiddleRight";
           break;
 
         // BOTTOM ROW (relativeTio > 6)
-        case relativeTop > containerHeight * 0.66 && relativeLeft < containerWidth * 0.33:
+        case relativeTop > containerHeight * 0.66 &&
+          relativeLeft < containerWidth * 0.33:
           position = "isBottomLeft";
           break;
-        case relativeTop > containerHeight * 0.66 && relativeLeft > containerWidth * 0.33 && relativeLeft < containerWidth * 0.66:
+        case relativeTop > containerHeight * 0.66 &&
+          relativeLeft > containerWidth * 0.33 &&
+          relativeLeft < containerWidth * 0.66:
           position = "isBottomCenter";
           break;
-        case relativeTop > containerHeight * 0.66 && relativeLeft > containerWidth * 0.66:
+        case relativeTop > containerHeight * 0.66 &&
+          relativeLeft > containerWidth * 0.66:
           position = "isBottomRight";
           break;
 
@@ -1380,19 +2265,19 @@ function getItemInfoStates(itemName, category) {
       type: "warning",
       summary: "Low stock detected",
       followUp: "◬ Reorder before it runs out",
-      full: `This ${itemName} may be low on availability soon. Add it to your next To-Get list before the price changes or stock drops.`,
+      full: `${itemName} may be low on availability soon. Add it to your next To-Get list before the price changes or stock drops.`,
     },
     {
       type: "recommendation",
       summary: "Good match for dinner",
       followUp: "◬ Try a fresh recipe idea",
-      full: `This ${itemName} works nicely in a new recipe recommendation based on your recent shopping habits. Tap to explore ideas.`,
+      full: `${itemName} works nicely in a new recipe recommendation based on your recent shopping habits. Tap to explore ideas.`,
     },
     {
       type: "reminder",
       summary: "Use soon",
       followUp: "◬ Looks like it might expire",
-      full: `This ${itemName} could be used soon. Check your kitchen stock and schedule it into one of your upcoming meals.`,
+      full: `${itemName} could be used soon. Check your kitchen stock and schedule it into one of your upcoming meals.`,
     },
   ];
 
@@ -1556,7 +2441,7 @@ function createItemCardSection(itemName, quantity, price) {
   section.innerHTML = `
     <div class="item-image-modal"></div>
     <div class="item-card">
-      <div class="img" style="border-color: ${accent.border}; background-image: url("images/image1.jpg")"></div>
+      <div class="img" style="border-left-color: ${accent.border}; background-image: url(images/image1.jpg)"></div>
       <div class="details">
         <div class="item-name">${itemName}</div>
         <div class="item-info" tabindex="0" role="button">
@@ -1804,6 +2689,7 @@ function updateGlobalEmptyState() {
       globalMessage = document.createElement("div");
       globalMessage.className = "empty-state-global";
       globalMessage.textContent = "Nothing added yet.";
+      // globalMessage.textContent = "No items in your list.";
       cardContainer.appendChild(globalMessage);
     }
   } else if (globalMessage) {
@@ -1912,8 +2798,17 @@ if (saveItemBtn) {
         ? selectedCategory.textContent.trim() || "Other"
         : "Other";
 
+      if (itemName.length === 0) {
+        itemNameInput.focus();
+      }
+
       if (!itemName) {
         showToast("Please enter an item name!");
+        itemNameInput.style.borderColor = "red";
+        itemNameInput.focus();
+        if (itemName.length > 0) {
+          itemNameInput.style.borderColor = "blue";
+        }
         recordAdminMetric("errors", 1);
         recordAdminEvent("Invalid add attempt: missing item name");
         return;
@@ -1921,6 +2816,8 @@ if (saveItemBtn) {
 
       if (isNaN(price) || price <= 0) {
         showToast("Please enter a valid price!");
+        priceInput.style.borderColor = "red";
+        priceInput.focus();
         recordAdminMetric("errors", 1);
         recordAdminEvent("Invalid add attempt: invalid price");
         return;
@@ -1950,14 +2847,14 @@ if (saveItemBtn) {
 
       const existingItemSection = categoryCard
         ? Array.from(categoryCard.querySelectorAll(".item-card-sec")).find(
-            (section) => {
-              const itemTitle = section.querySelector(".item-name");
-              return (
-                itemTitle &&
-                itemTitle.textContent.trim().toLowerCase() === normalizedName
-              );
-            },
-          )
+          (section) => {
+            const itemTitle = section.querySelector(".item-name");
+            return (
+              itemTitle &&
+              itemTitle.textContent.trim().toLowerCase() === normalizedName
+            );
+          },
+        )
         : null;
 
       let updatedQuantity = quantity;
@@ -2608,22 +3505,6 @@ function closeFab() {
   fabCamera.classList.remove("visible");
 }
 
-// ===== TOAST NOTIFICATION =====
-function showToast(message) {
-  let toast = document.querySelector(".toast");
-
-  if (!toast) {
-    toast = document.createElement("div");
-    toast.className = "toast";
-    document.body.appendChild(toast);
-  }
-
-  toast.textContent = message;
-  toast.classList.add("show");
-
-  setTimeout(() => toast.classList.remove("show"), 2000);
-}
-
 // ===== SETTINGS PAGE FUNCTIONALITY =====
 const settingsOptions = {
   "theme-toggle": () => {
@@ -2667,12 +3548,9 @@ const settingsOptions = {
     showToast("Data exported");
   },
   "clear-data": () => {
-    if (
-      confirm("Are you sure you want to clear all data? This cannot be undone.")
-    ) {
-      localStorage.clear();
-      location.reload();
-    }
+    // Close settings and open the typed confirmation delete panel
+    if (settingsPage) settingsPage.classList.remove("show");
+    showDeletePanel();
   },
   "privacy-policy": () => {
     showToast("Opening privacy policy...");
@@ -2762,6 +3640,17 @@ window.addEventListener("DOMContentLoaded", () => {
   if (notificationsEnabled === "false" && notifToggle) {
     notifToggle.checked = false;
   }
+  
+  // Initialize favorites display and like buttons
+  displayFavorites();
+  initializeLikeButtons();
+  updateLikeButtonStates();
+  if (typeof setupInsightRecipeFavorites === "function") {
+    setupInsightRecipeFavorites();
+  }
+  if (typeof renderToGetItems === "function") {
+    renderToGetItems();
+  }
 });
 
 // ===== PROFILE PAGE SCROLL EFFECT =====
@@ -2810,7 +3699,7 @@ if (profileForeground) {
       if (isAnimating) return;
       isAnimating = true;
 
-      const targetProgress = currentProgress > 0.5 ? 1 : 0;
+      const targetProgress = currentProgress >= 0.5 ? 1 : 0;
       const startProgress = currentProgress;
       const startTime = performance.now();
       const duration = 300; // milliseconds for completion animation
