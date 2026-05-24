@@ -106,7 +106,7 @@ function updateAdminChart() {
   ];
 
   // Find max value for scaling
-  const maxValue = Math.max(...chartData.map(item => item.value), 1);
+  const maxValue = Math.max(...chartData.map((item) => item.value), 1);
   const barHeightPercent = (value) => Math.max((value / maxValue) * 100, 10);
 
   chartGrid.innerHTML = chartData
@@ -521,21 +521,86 @@ function saveFavorites(favorites) {
 
 function getRecipeCategory(recipeName) {
   const categories = {
-    pastry: ["cake", "pie", "tart", "croissant", "donut", "pastry", "bread", "biscuit", "cookie"],
-    snack: ["chips", "popcorn", "nuts", "trail mix", "snack", "appetizer", "dip"],
-    meat: ["chicken", "beef", "pork", "lamb", "turkey", "steak", "ribs", "ham", "sausage", "meatball"],
-    beverage: ["juice", "smoothie", "coffee", "tea", "shake", "drink", "cocktail", "wine", "beer", "latte"],
+    pastry: [
+      "cake",
+      "pie",
+      "tart",
+      "croissant",
+      "donut",
+      "pastry",
+      "bread",
+      "biscuit",
+      "cookie",
+    ],
+    snack: [
+      "chips",
+      "popcorn",
+      "nuts",
+      "trail mix",
+      "snack",
+      "appetizer",
+      "dip",
+    ],
+    meat: [
+      "chicken",
+      "beef",
+      "pork",
+      "lamb",
+      "turkey",
+      "steak",
+      "ribs",
+      "ham",
+      "sausage",
+      "meatball",
+    ],
+    beverage: [
+      "juice",
+      "smoothie",
+      "coffee",
+      "tea",
+      "shake",
+      "drink",
+      "cocktail",
+      "wine",
+      "beer",
+      "latte",
+    ],
     salad: ["salad", "slaw", "coleslaw", "greens"],
-    pudding: ["pudding", "mousse", "dessert", "tiramisu", "cheesecake", "brownie"],
-    seafood: ["fish", "salmon", "tuna", "shrimp", "crab", "lobster", "squid", "oyster", "seafood"],
+    pudding: [
+      "pudding",
+      "mousse",
+      "dessert",
+      "tiramisu",
+      "cheesecake",
+      "brownie",
+    ],
+    seafood: [
+      "fish",
+      "salmon",
+      "tuna",
+      "shrimp",
+      "crab",
+      "lobster",
+      "squid",
+      "oyster",
+      "seafood",
+    ],
     pasta: ["pasta", "spaghetti", "lasagna", "noodle", "ravioli"],
     soup: ["soup", "broth", "stew", "chowder", "bisque"],
-    vegetarian: ["tofu", "vegetable", "veggie", "vegan", "greens", "spinach", "kale"]
+    vegetarian: [
+      "tofu",
+      "vegetable",
+      "veggie",
+      "vegan",
+      "greens",
+      "spinach",
+      "kale",
+    ],
   };
-  
+
   const lowerName = recipeName.toLowerCase();
   for (const [category, keywords] of Object.entries(categories)) {
-    if (keywords.some(keyword => lowerName.includes(keyword))) {
+    if (keywords.some((keyword) => lowerName.includes(keyword))) {
       return category;
     }
   }
@@ -544,17 +609,25 @@ function getRecipeCategory(recipeName) {
 
 function getRecipeImage(recipeName, category) {
   const images = {
-    pastry: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=200&h=200&fit=crop",
-    snack: "https://images.unsplash.com/photo-1599599810694-b5ac4dd64b73?w=200&h=200&fit=crop",
+    pastry:
+      "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=200&h=200&fit=crop",
+    snack:
+      "https://images.unsplash.com/photo-1599599810694-b5ac4dd64b73?w=200&h=200&fit=crop",
     meat: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop",
-    beverage: "https://images.unsplash.com/photo-1461023058943-07fcbe16d735?w=200&h=200&fit=crop",
-    salad: "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=200&h=200&fit=crop",
-    pudding: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=200&h=200&fit=crop",
-    seafood: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=200&h=200&fit=crop",
-    pasta: "https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=200&h=200&fit=crop",
+    beverage:
+      "https://images.unsplash.com/photo-1461023058943-07fcbe16d735?w=200&h=200&fit=crop",
+    salad:
+      "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=200&h=200&fit=crop",
+    pudding:
+      "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=200&h=200&fit=crop",
+    seafood:
+      "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=200&h=200&fit=crop",
+    pasta:
+      "https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=200&h=200&fit=crop",
     soup: "https://images.unsplash.com/photo-1547069900-7f62f0e71cb9?w=200&h=200&fit=crop",
-    vegetarian: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=200&h=200&fit=crop",
-    meal: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop"
+    vegetarian:
+      "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=200&h=200&fit=crop",
+    meal: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop",
   };
   return images[category] || images.meal;
 }
@@ -563,16 +636,22 @@ function addFavorite(type, name, origin = "") {
   const favorites = getFavorites();
   const category = type === "recipe" ? getRecipeCategory(name) : "";
   const image = type === "recipe" ? getRecipeImage(name, category) : "";
-  const item = { name: name.trim(), origin: origin.trim(), category, image, id: `${type}-${name}-${origin}` };
-  
+  const item = {
+    name: name.trim(),
+    origin: origin.trim(),
+    category,
+    image,
+    id: `${type}-${name}-${origin}`,
+  };
+
   if (type === "recipe") {
-    if (!favorites.recipes.find(r => r.id === item.id)) {
+    if (!favorites.recipes.find((r) => r.id === item.id)) {
       favorites.recipes.push(item);
       saveFavorites(favorites);
       return true;
     }
   } else if (type === "ingredient") {
-    if (!favorites.ingredients.find(i => i.id === item.id)) {
+    if (!favorites.ingredients.find((i) => i.id === item.id)) {
       favorites.ingredients.push(item);
       saveFavorites(favorites);
       return true;
@@ -584,13 +663,15 @@ function addFavorite(type, name, origin = "") {
 function removeFavorite(type, name, origin = "") {
   const favorites = getFavorites();
   const itemId = `${type}-${name}-${origin}`;
-  
+
   if (type === "recipe") {
-    favorites.recipes = favorites.recipes.filter(r => r.id !== itemId);
+    favorites.recipes = favorites.recipes.filter((r) => r.id !== itemId);
   } else if (type === "ingredient") {
-    favorites.ingredients = favorites.ingredients.filter(i => i.id !== itemId);
+    favorites.ingredients = favorites.ingredients.filter(
+      (i) => i.id !== itemId,
+    );
   }
-  
+
   saveFavorites(favorites);
   return true;
 }
@@ -598,11 +679,11 @@ function removeFavorite(type, name, origin = "") {
 function isFavorite(type, name, origin = "") {
   const favorites = getFavorites();
   const itemId = `${type}-${name}-${origin}`;
-  
+
   if (type === "recipe") {
-    return favorites.recipes.some(r => r.id === itemId);
+    return favorites.recipes.some((r) => r.id === itemId);
   } else if (type === "ingredient") {
-    return favorites.ingredients.some(i => i.id === itemId);
+    return favorites.ingredients.some((i) => i.id === itemId);
   }
   return false;
 }
@@ -611,25 +692,27 @@ function displayFavorites() {
   const favorites = getFavorites();
   const favRecipesContainer = document.querySelector(".fav-recipes");
   const favIngredientsContainer = document.querySelector(".fav-ingredients");
-  
+
   if (favRecipesContainer) {
     favRecipesContainer.innerHTML = "";
     if (favorites.recipes.length === 0) {
-      favRecipesContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #999;">No favourite recipes yet</div>';
+      favRecipesContainer.innerHTML =
+        '<div style="padding: 20px; text-align: center; color: #999;">No favourite recipes yet</div>';
     } else {
-      favorites.recipes.forEach(recipe => {
+      favorites.recipes.forEach((recipe) => {
         const recipeEl = createFavRecipeElement(recipe);
         favRecipesContainer.appendChild(recipeEl);
       });
     }
   }
-  
+
   if (favIngredientsContainer) {
     favIngredientsContainer.innerHTML = "";
     if (favorites.ingredients.length === 0) {
-      favIngredientsContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #999;">No favourite ingredients yet</div>';
+      favIngredientsContainer.innerHTML =
+        '<div style="padding: 20px; text-align: center; color: #999;">No favourite ingredients yet</div>';
     } else {
-      favorites.ingredients.forEach(ingredient => {
+      favorites.ingredients.forEach((ingredient) => {
         const ingredientEl = createFavIngredientElement(ingredient);
         favIngredientsContainer.appendChild(ingredientEl);
       });
@@ -642,9 +725,12 @@ function createFavRecipeElement(recipe) {
   div.className = "fav-recipe-item";
   div.setAttribute("data-name", recipe.name);
   div.setAttribute("data-origin", recipe.origin);
-  const imageUrl = recipe.image || getRecipeImage(recipe.name, recipe.category || "meal");
-  const categoryDisplay = recipe.category ? recipe.category.charAt(0).toUpperCase() + recipe.category.slice(1) : "Meal";
-  
+  const imageUrl =
+    recipe.image || getRecipeImage(recipe.name, recipe.category || "meal");
+  const categoryDisplay = recipe.category
+    ? recipe.category.charAt(0).toUpperCase() + recipe.category.slice(1)
+    : "Meal";
+
   div.innerHTML = `
     <div class="fav-recipe-image-container">
       <img src="${imageUrl}" alt="${recipe.name}" class="fav-recipe-image" onerror="this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop'">
@@ -684,18 +770,20 @@ function createFavIngredientElement(ingredient) {
 
 // ===== UPDATE LIKE BUTTON STATES =====
 function updateLikeButtonStates() {
-  const likeButtons = document.querySelectorAll(".like-item:not(.in-favorites)");
-  
+  const likeButtons = document.querySelectorAll(
+    ".like-item:not(.in-favorites)",
+  );
+
   likeButtons.forEach((btn) => {
     const recipeItem = btn.closest(".recipe-item");
     const mealName = recipeItem?.querySelector(".meal-name");
     const placeOfRecipe = recipeItem?.querySelector(".place-of-recipe");
-    
+
     if (!mealName) return;
-    
-    const name = mealName.textContent.split('\n')[0].trim();
+
+    const name = mealName.textContent.split("\n")[0].trim();
     const origin = placeOfRecipe ? placeOfRecipe.textContent.trim() : "";
-    
+
     if (isFavorite("recipe", name, origin)) {
       btn.classList.add("liked");
     } else {
@@ -707,27 +795,27 @@ function updateLikeButtonStates() {
 // ===== INITIALIZE LIKE BUTTONS =====
 function initializeLikeButtons() {
   const likeButtons = document.querySelectorAll(".like-item");
-  
+
   likeButtons.forEach((heart) => {
     // Skip if already initialized
     if (heart.dataset.initialized === "true") return;
     heart.dataset.initialized = "true";
-    
+
     heart.addEventListener("click", (e) => {
       e.stopPropagation();
-      
+
       // Get item information from the parent structure
       const recipeItem = heart.closest(".recipe-item");
       const mealName = recipeItem?.querySelector(".meal-name");
       const placeOfRecipe = recipeItem?.querySelector(".place-of-recipe");
-      
+
       if (!mealName) return;
-      
-      const name = mealName.textContent.split('\n')[0].trim();
+
+      const name = mealName.textContent.split("\n")[0].trim();
       const origin = placeOfRecipe ? placeOfRecipe.textContent.trim() : "";
-      
+
       heart.classList.toggle("liked");
-      
+
       if (heart.classList.contains("liked")) {
         addFavorite("recipe", name, origin);
         showToast(`✓ ${name} added to favorites`);
@@ -737,23 +825,23 @@ function initializeLikeButtons() {
       }
     });
   });
-  
+
   // Handle like buttons in favorites containers with event delegation
   const favRecipesContainer = document.querySelector(".fav-recipes");
   const favIngredientsContainer = document.querySelector(".fav-ingredients");
-  
+
   if (favRecipesContainer) {
     favRecipesContainer.addEventListener("click", (e) => {
       const likeBtn = e.target.closest(".fav-recipe-heart, .like-item");
       if (!likeBtn) return;
-      
+
       e.stopPropagation();
       const recipeItem = likeBtn.closest(".fav-recipe-item, .recipe-item");
-      
+
       if (!recipeItem) return;
-      
+
       let name, origin;
-      
+
       // Handle new thin recipe format
       if (recipeItem.classList.contains("fav-recipe-item")) {
         name = recipeItem.getAttribute("data-name");
@@ -762,26 +850,28 @@ function initializeLikeButtons() {
         // Handle old format
         const mealName = recipeItem.querySelector(".meal-name");
         if (!mealName) return;
-        name = mealName.textContent.split('\n')[0].trim();
-        origin = recipeItem.querySelector(".place-of-recipe")?.textContent.trim() || "";
+        name = mealName.textContent.split("\n")[0].trim();
+        origin =
+          recipeItem.querySelector(".place-of-recipe")?.textContent.trim() ||
+          "";
       }
-      
+
       if (!name) return;
       removeFavorite("recipe", name, origin);
       showToast(`✕ ${name} removed from favorites`);
     });
   }
-  
+
   if (favIngredientsContainer) {
     favIngredientsContainer.addEventListener("click", (e) => {
       const likeBtn = e.target.closest(".like-item");
       if (!likeBtn) return;
-      
+
       e.stopPropagation();
       const ingredientName = likeBtn.previousElementSibling?.textContent.trim();
-      
+
       if (!ingredientName) return;
-      
+
       removeFavorite("ingredient", ingredientName, "");
       showToast("✕ Removed from favorites");
     });
@@ -789,13 +879,16 @@ function initializeLikeButtons() {
 }
 
 function setupInsightRecipeFavorites() {
-  const insightsRecipeSection = insightsPage?.querySelector(".item-recipe-details");
+  const insightsRecipeSection = insightsPage?.querySelector(
+    ".item-recipe-details",
+  );
   if (!insightsRecipeSection) return;
 
   insightsRecipeSection.addEventListener("click", (e) => {
     const recipeItem = e.target.closest(".recipe-item");
     if (!recipeItem) return;
-    if (e.target.closest(".like-item") || e.target.closest(".expand-item")) return;
+    if (e.target.closest(".like-item") || e.target.closest(".expand-item"))
+      return;
 
     const mealName = recipeItem.querySelector(".meal-name");
     const placeOfRecipe = recipeItem.querySelector(".place-of-recipe");
@@ -1040,7 +1133,7 @@ function showDeletePanel() {
   const confirmBtn = document.getElementById("confirmDeleteAction");
   if (confirmBtn) {
     confirmBtn.disabled = true;
-    
+
     // Only show input when user clicks to delete
     const onDeleteClick = () => {
       // Create input if it doesn't exist yet
@@ -1053,7 +1146,8 @@ function showDeletePanel() {
         input.style.marginBottom = "10px";
         const instructions = document.createElement("div");
         instructions.className = "confirm-delete-instructions";
-        instructions.textContent = 'Type "clear" (without quotes) to confirm clearing all data.';
+        instructions.textContent =
+          'Type "clear" (without quotes) to confirm clearing all data.';
         instructions.style.marginBottom = "10px";
         instructions.style.fontSize = "12px";
         // Insert above the confirm button
@@ -1072,7 +1166,10 @@ function showDeletePanel() {
       input.focus();
     };
 
-    confirmBtn.removeEventListener("click", confirmBtn._deleteClickListener || (() => {}));
+    confirmBtn.removeEventListener(
+      "click",
+      confirmBtn._deleteClickListener || (() => {}),
+    );
     confirmBtn._deleteClickListener = onDeleteClick;
     // First click shows the input
     confirmBtn.addEventListener("click", onDeleteClick);
@@ -1114,7 +1211,9 @@ function closeDeletePanel() {
   }
   // cleanup input state and remove it so it appears fresh next time
   const input = deletePanel?.querySelector("#confirmDeleteInput");
-  const instructions = deletePanel?.querySelector(".confirm-delete-instructions");
+  const instructions = deletePanel?.querySelector(
+    ".confirm-delete-instructions",
+  );
   if (input) {
     input.value = "";
     input.remove();
@@ -1316,7 +1415,9 @@ function createToGetItemElement(item) {
 }
 
 const toGetItemModal = document.querySelector(".to-get-item-modal");
-const toGetItemModalOptions = document.querySelectorAll(".to-get-item-modal-option");
+const toGetItemModalOptions = document.querySelectorAll(
+  ".to-get-item-modal-option",
+);
 
 function openToGetItemModal(card) {
   if (!toGetItemModal || !card) return;
@@ -1336,7 +1437,9 @@ toGetItemModalOptions.forEach((option) => {
     const action = option.textContent.trim();
     const itemId = toGetItemModal.dataset.itemId;
     const items = getToGetItems();
-    const itemIndex = items.findIndex((item) => String(item.id) === String(itemId));
+    const itemIndex = items.findIndex(
+      (item) => String(item.id) === String(itemId),
+    );
 
     if (action === "Remove" && itemIndex !== -1) {
       items.splice(itemIndex, 1);
@@ -1386,7 +1489,9 @@ toGetItemModalOptions.forEach((option) => {
 function renderToGetItems() {
   let container = document.querySelector(".to-get-items");
   const pageContent = toGetListPage?.querySelector(".full-page-content");
-  const emptyCard = pageContent?.querySelector(".notification-empty .empty-page-card");
+  const emptyCard = pageContent?.querySelector(
+    ".notification-empty .empty-page-card",
+  );
 
   if (!container && pageContent) {
     container = document.createElement("div");
@@ -1506,12 +1611,11 @@ if (addFromRecipeBtn) {
 
 const addIngredient = document.querySelectorAll(".add-ingredient");
 
-addIngredient.forEach(add => {
+addIngredient.forEach((add) => {
   add.addEventListener("click", (e) => {
     e.stopPropagation();
-
-  })
-})
+  });
+});
 
 const prepareRecipeButton = document.getElementById("prepareRecipeButton");
 const makeRecipePage = document.getElementById("makeRecipePage");
@@ -1519,7 +1623,7 @@ const makeRecipePage = document.getElementById("makeRecipePage");
 prepareRecipeButton.addEventListener("click", (e) => {
   e.stopPropagation();
   makeRecipePage.classList.add("show");
-})
+});
 
 function closeMenu() {
   menuPage.classList.remove("show");
@@ -2847,14 +2951,14 @@ if (saveItemBtn) {
 
       const existingItemSection = categoryCard
         ? Array.from(categoryCard.querySelectorAll(".item-card-sec")).find(
-          (section) => {
-            const itemTitle = section.querySelector(".item-name");
-            return (
-              itemTitle &&
-              itemTitle.textContent.trim().toLowerCase() === normalizedName
-            );
-          },
-        )
+            (section) => {
+              const itemTitle = section.querySelector(".item-name");
+              return (
+                itemTitle &&
+                itemTitle.textContent.trim().toLowerCase() === normalizedName
+              );
+            },
+          )
         : null;
 
       let updatedQuantity = quantity;
@@ -3640,7 +3744,7 @@ window.addEventListener("DOMContentLoaded", () => {
   if (notificationsEnabled === "false" && notifToggle) {
     notifToggle.checked = false;
   }
-  
+
   // Initialize favorites display and like buttons
   displayFavorites();
   initializeLikeButtons();
