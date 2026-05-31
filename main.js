@@ -1,10 +1,10 @@
 // ===== ELEMENT REFERENCES =====
-const periodBtn = document.getElementById("periodBtn");
+/* const periodBtn = document.getElementById("periodBtn");
 const periodWrapper = document.getElementById("periodWrapper");
 const periodMenu = document.getElementById("periodMenu");
 const periodValue = document.getElementById("periodValue");
 const rangeModal = document.getElementById("rangeModal");
-const rangeText = document.getElementById("rangeText");
+const rangeText = document.getElementById("rangeText"); */
 
 // Insights page elements
 const insightTotal = document.getElementById("insightTotal");
@@ -43,11 +43,25 @@ window.addEventListener(
 );
 
 // State variables
+const BUDGET_KEY = "planup_budget";
+const ALERT_KEY = "planup_alert_percent";
+const BUDGET_ALERTS_ENABLED_KEY = "planup_budget_alerts_enabled";
+
 let items = JSON.parse(localStorage.getItem("planup_items")) || [];
-let budget = 500;
-let currentPeriod = "month";
-let selectedRange = "This month";
-let budgetExceededNotified = false;
+let budget = parseFloat(localStorage.getItem(BUDGET_KEY));
+if (isNaN(budget) || budget < 50) {
+  budget = 500;
+}
+let alertAtBudget = parseInt(localStorage.getItem(ALERT_KEY), 10);
+if (isNaN(alertAtBudget) || alertAtBudget < 1 || alertAtBudget > 100) {
+  alertAtBudget = 80;
+}
+let budgetAlertsEnabled = localStorage.getItem(BUDGET_ALERTS_ENABLED_KEY) !== "false"; // default true
+window.__budgetAlertNotified = false; // runtime flag to avoid repeated alerts
+
+/* let currentPeriod = "month";
+let selectedRange = "This month"; */
+let budgetExceededNotified = false; // legacy flag (kept for compatibility)
 let activeNotifications = [];
 
 const ADMIN_PASSWORD = "planupadmin";
@@ -154,11 +168,38 @@ const notificationMessage = document.getElementById("notificationMessage");
 const searchBar = document.getElementById("searchBar");
 const feedbackBtn = document.getElementById("feedbackBtn");
 
+// Recipe panel elements
+const recipeSearchInput = document.getElementById("recipeSearchInput");
+const recipeList = document.getElementById("recipeList");
+const recipeLoading = document.getElementById("recipeLoading");
+const recipeTrending = document.getElementById("recipeTrending");
+const trendingList = document.getElementById("trendingList");
+const backFromRecipe = document.getElementById("backFromRecipe");
+const prepareRecipeButton = document.getElementById("prepareRecipeButton");
+const makeRecipePage = document.getElementById("makeRecipePage");
+const makeRecipeName = document.getElementById("makeRecipeName");
+const makeRecipeOrigin = document.getElementById("makeRecipeOrigin");
+const makeRecipeTechnique = document.getElementById("makeRecipeTechnique");
+const makeRecipeServings = document.getElementById("makeRecipeServings");
+const makeRecipePrepTime = document.getElementById("makeRecipePrepTime");
+const makeRecipeCookTime = document.getElementById("makeRecipeCookTime");
+const makeRecipeMatchText = document.getElementById("makeRecipeMatchText");
+const makeRecipeIngredientsList = document.getElementById(
+  "makeRecipeIngredientsList",
+);
+const makeRecipeMissingList = document.getElementById("makeRecipeMissingList");
+const makeRecipeMethodTitle = document.getElementById("makeRecipeMethodTitle");
+const makeRecipeSteps = document.getElementById("makeRecipeSteps");
+const prepareLoading = document.getElementById("prepareLoading");
+
+let selectedRecipe = null;
+let currentRecipeResults = [];
+
 // Pages
 const homePage = document.getElementById("homePage");
 const insightsPage = document.getElementById("insightsPage");
 const profilePage = document.getElementById("profilePage");
-const toGetListPage = document.getElementById("toGetListPage");
+// const toGetListPage = document.getElementById("toGetListPage");
 const notificationPage = document.getElementById("notificationPage");
 const favoritesPage = document.getElementById("favoritesPage");
 const historyPage = document.getElementById("historyPage");
@@ -166,11 +207,11 @@ const dashboardPage = document.getElementById("dashboardPage");
 const scheduledPage = document.getElementById("scheduledPage");
 const feedbackPage = document.getElementById("feedbackPage");
 
-document.getElementById("navMyItems").onclick = () => {
+document.getElementById("navInventory").onclick = () => {
   homePage.style.display = "block";
   fab.classList.remove("hide");
 
-  navMyItems.classList.add("active");
+  navInventory.classList.add("active");
   homePage.classList.remove("hide");
   navInsights.classList.remove("active");
   insightsPage.classList.remove("show");
@@ -188,7 +229,7 @@ document.getElementById("navInsights").onclick = () => {
 
   insightsPage.classList.add("show");
   navInsights.classList.add("active");
-  navMyItems.classList.remove("active");
+  navInventory.classList.remove("active");
   homePage.classList.add("hide");
   navProfiles.classList.remove("active");
   profilePage.classList.remove("show");
@@ -198,9 +239,11 @@ document.getElementById("navInsights").onclick = () => {
 
   closeModal();
   renderInsightsChart();
+  updateInsightsPage();
+  setupChartToggle();
 };
 
-if (periodBtn && periodWrapper) {
+/* if (periodBtn && periodWrapper) {
   periodBtn.addEventListener("click", (e) => {
     e.stopPropagation();
     closeRangeModal();
@@ -229,9 +272,9 @@ if (periodMenu) {
     updatePeriodMenu();
     periodWrapper.classList.remove("open");
   });
-}
+} */
 
-document.addEventListener("click", (e) => {
+/* document.addEventListener("click", (e) => {
   if (periodWrapper && !periodWrapper.contains(e.target)) {
     periodWrapper.classList.remove("open");
   }
@@ -239,9 +282,9 @@ document.addEventListener("click", (e) => {
   if (rangeModal && !rangeModal.contains(e.target) && e.target !== rangeText) {
     closeRangeModal();
   }
-});
+}); */
 
-if (rangeText) {
+/* if (rangeText) {
   rangeText.addEventListener("click", (e) => {
     e.stopPropagation();
     if (periodWrapper) periodWrapper.classList.remove("open");
@@ -252,7 +295,7 @@ if (rangeText) {
       openRangeModal();
     }
   });
-}
+} */
 
 /* function openRangeModal() {
   rangeModal.innerHTML = "";
@@ -277,7 +320,7 @@ if (rangeText) {
   rangeModal.classList.add("open");
 } */
 
-function openRangeModal() {
+/* function openRangeModal() {
   rangeModal.innerHTML = "";
 
   const options =
@@ -327,11 +370,11 @@ function openRangeModal() {
   };
   window.addEventListener("resize", reposition);
   window.addEventListener("scroll", reposition, { passive: true });
-}
+} */
 
-function closeRangeModal() {
+/* function closeRangeModal() {
   if (rangeModal) rangeModal.classList.remove("open");
-}
+} */
 
 /* function getRangeStart(period, range) {
   const now = new Date();
@@ -353,6 +396,93 @@ function closeRangeModal() {
   return now.getTime();
 } */
 
+// ===== RANGE MODAL - FIXED & IMPROVED =====
+/* if (rangeText) {
+  rangeText.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (periodWrapper) periodWrapper.classList.remove("open");
+
+    if (rangeModal.classList.contains("open")) {
+      closeRangeModal();
+    } else {
+      openRangeModal();
+    }
+  });
+}
+
+function openRangeModal() {
+  rangeModal.innerHTML = "";
+
+  const options = currentPeriod === "month"
+    ? ["This month", "Last month", "Last 2 months", "Last 3 months"]
+    : ["This week", "Last week", "Last 2 weeks", "Last 3 weeks"];
+
+  options.forEach((opt) => {
+    const div = document.createElement("div");
+    div.className = "range-option";
+    div.textContent = opt;
+
+    div.addEventListener("click", (e) => {
+      e.stopPropagation();
+      selectedRange = opt;
+      if (rangeText) rangeText.textContent = opt;
+      closeRangeModal();
+    });
+
+    rangeModal.appendChild(div);
+  });
+
+  // === Better Positioning ===
+  positionRangeModal();
+
+  rangeModal.classList.add("open");
+}
+
+function positionRangeModal() {
+  if (!rangeText || !rangeModal) return;
+
+  const rect = rangeText.getBoundingClientRect();
+
+  rangeModal.style.position = "fixed";           // Use fixed for better consistency
+  rangeModal.style.top = `${rect.bottom + 8}px`;
+  rangeModal.style.left = `${rect.left}px`;
+  rangeModal.style.minWidth = `${Math.max(180, rect.width)}px`;
+  rangeModal.style.zIndex = "10000";
+}
+
+function closeRangeModal() {
+  if (rangeModal) {
+    rangeModal.classList.remove("open");
+  }
+}
+
+// Close when clicking outside
+document.addEventListener("click", (e) => {
+  if (rangeModal && rangeModal.classList.contains("open")) {
+    if (!rangeModal.contains(e.target) && e.target !== rangeText) {
+      closeRangeModal();
+    }
+  }
+
+  if (periodWrapper && !periodWrapper.contains(e.target)) {
+    periodWrapper.classList.remove("open");
+  }
+});
+
+// Reposition on scroll/resize (throttled)
+let repositionTimeout;
+function handleReposition() {
+  clearTimeout(repositionTimeout);
+  repositionTimeout = setTimeout(() => {
+    if (rangeModal.classList.contains("open")) {
+      positionRangeModal();
+    }
+  }, 10);
+}
+
+window.addEventListener("scroll", handleReposition, { passive: true });
+window.addEventListener("resize", handleReposition);
+
 function getRangeStart(period, range) {
   const now = new Date();
 
@@ -372,13 +502,651 @@ function getRangeStart(period, range) {
   }
 
   return now.getTime();
-}
-
+} */
+/* 
 function capitalize(str) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
-updatePeriodMenu();
+updatePeriodMenu(); */
+
+/// ====================== PERIOD & RANGE SELECTOR - PERSISTENT RANGES ======================
+const periodBtn = document.getElementById("periodBtn");
+const periodWrapper = document.getElementById("periodWrapper");
+const periodMenu = document.getElementById("periodMenu");
+const periodValue = document.getElementById("periodValue");
+const rangeText = document.getElementById("rangeText");
+const rangeModal = document.getElementById("rangeModal");
+
+let currentPeriod = "month";
+
+// Store last selected range for each period
+let periodRanges = {
+  month: "This month",
+  week: "This week",
+};
+
+let selectedRange = periodRanges[currentPeriod];
+
+// Period Toggle
+if (periodBtn && periodWrapper) {
+  periodBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    periodWrapper.classList.toggle("open");
+    updatePeriodOptionText();
+  });
+}
+
+// Update dropdown option text (shows the opposite)
+function updatePeriodOptionText() {
+  if (!periodMenu) return;
+  const option = periodMenu.querySelector(".option") || periodMenu;
+  if (option) {
+    option.textContent = currentPeriod === "month" ? "Week" : "Month";
+  }
+}
+
+// Switch Period
+if (periodMenu) {
+  periodMenu.addEventListener("click", () => {
+    // Save current range before switching
+    periodRanges[currentPeriod] = selectedRange;
+
+    // Switch period
+    currentPeriod = currentPeriod === "month" ? "week" : "month";
+
+    // Restore previously saved range for this period
+    selectedRange = periodRanges[currentPeriod];
+
+    // Update UI
+    if (periodValue) {
+      periodValue.textContent =
+        currentPeriod.charAt(0).toUpperCase() + currentPeriod.slice(1);
+    }
+    if (rangeText) rangeText.textContent = selectedRange;
+
+    updatePeriodOptionText();
+    periodWrapper.classList.remove("open");
+  });
+}
+
+// Range Modal
+if (rangeText) {
+  rangeText.addEventListener("click", (e) => {
+    e.stopPropagation();
+    periodWrapper.classList.remove("open");
+
+    if (rangeModal.classList.contains("open")) {
+      rangeModal.classList.remove("open");
+    } else {
+      openRangeModal();
+    }
+  });
+}
+
+function openRangeModal() {
+  rangeModal.innerHTML = "";
+
+  const options =
+    currentPeriod === "month"
+      ? ["This month", "Last month", "Last 2 months", "Last 3 months"]
+      : ["This week", "Last week", "Last 2 weeks", "Last 3 weeks"];
+
+  options.forEach((opt) => {
+    const div = document.createElement("div");
+    div.className = "range-option";
+    div.textContent = opt;
+
+    // Highlight currently selected
+    if (opt === selectedRange) {
+      div.style.background = "#e0f0e0";
+      div.style.fontWeight = "600";
+    }
+
+    div.addEventListener("click", (e) => {
+      e.stopPropagation();
+      selectedRange = opt;
+      periodRanges[currentPeriod] = opt; // Save it for this period
+      if (rangeText) rangeText.textContent = opt;
+      rangeModal.classList.remove("open");
+
+      updateInsightsPage();
+      renderInsightsChart();
+    });
+
+    rangeModal.appendChild(div);
+  });
+
+  rangeModal.classList.add("open");
+}
+
+// Close when clicking outside
+document.addEventListener("click", (e) => {
+  if (periodWrapper && !periodWrapper.contains(e.target)) {
+    periodWrapper.classList.remove("open");
+  }
+  if (rangeModal && !rangeModal.contains(e.target) && e.target !== rangeText) {
+    rangeModal.classList.remove("open");
+  }
+});
+
+// Initialize on load
+updatePeriodOptionText();
+if (rangeText) rangeText.textContent = selectedRange;
+
+// ====================== DATE RANGE FILTERING LOGIC ======================
+
+// Get start timestamp based on period and range
+function getRangeStart(period, range) {
+  const now = new Date();
+  const start = new Date(now);
+
+  if (period === "week") {
+    switch (range) {
+      case "This week":
+        start.setDate(now.getDate() - 7);
+        break;
+      case "Last week":
+        start.setDate(now.getDate() - 14);
+        break;
+      case "Last 2 weeks":
+        start.setDate(now.getDate() - 21);
+        break;
+      case "Last 3 weeks":
+        start.setDate(now.getDate() - 28);
+        break;
+      default:
+        start.setDate(now.getDate() - 7);
+    }
+  } else if (period === "month") {
+    switch (range) {
+      case "This month":
+        start.setMonth(now.getMonth() - 1);
+        break;
+      case "Last month":
+        start.setMonth(now.getMonth() - 2);
+        break;
+      case "Last 2 months":
+        start.setMonth(now.getMonth() - 3);
+        break;
+      case "Last 3 months":
+        start.setMonth(now.getMonth() - 4);
+        break;
+      default:
+        start.setMonth(now.getMonth() - 1);
+    }
+  }
+
+  // Reset to start of day
+  start.setHours(0, 0, 0, 0);
+  return start.getTime();
+}
+
+// Get end timestamp (usually now)
+function getRangeEnd() {
+  return Date.now();
+}
+
+// Filter items based on current period + range
+// ====================== DATE RANGE + INSIGHTS LOGIC ======================
+
+// Get filtered items based on current period and range
+function getFilteredItems() {
+  if (!items || items.length === 0) return [];
+
+  const startTime = getRangeStart(currentPeriod, selectedRange);
+  const endTime = Date.now();
+
+  return items.filter((item) => {
+    const itemTime = new Date(
+      item.createdAt || item.timestamp || item.updatedAt || Date.now(),
+    ).getTime();
+    return itemTime >= startTime && itemTime <= endTime;
+  });
+}
+
+// Main function to update all insights metrics
+/* function updateInsightsPage() {
+  const filteredItems = getFilteredItems();
+
+  let totalSpent = 0;
+  let totalItemsCount = 0;
+  const categoryStats = {};
+
+  filteredItems.forEach(item => {
+    const price = parseFloat(item.price) || 0;
+    const qty = parseInt(item.quantity) || 1;
+    
+    totalSpent += price;
+    totalItemsCount += qty;
+
+    const cat = (item.category || "Other").trim();
+    if (!categoryStats[cat]) {
+      categoryStats[cat] = { totalPrice: 0, totalQty: 0 };
+    }
+    categoryStats[cat].totalPrice += price;
+    categoryStats[cat].totalQty += qty;
+  });
+
+  // Update Overview Cards
+  document.getElementById("overviewTotalSpent").textContent = `$${totalSpent.toFixed(2)}`;
+  document.getElementById("overviewTotalItems").textContent = totalItemsCount;
+
+  // Budget Used
+  const budgetUsedPercent = budget > 0 ? Math.min(100, Math.round((totalSpent / budget) * 100)) : 0;
+  document.getElementById("overviewTotalBudget").textContent = `${budgetUsedPercent}%`;
+
+  // Top Category
+  let topCategory = "None";
+  let maxSpent = 0;
+  Object.keys(categoryStats).forEach(cat => {
+    if (categoryStats[cat].totalPrice > maxSpent) {
+      maxSpent = categoryStats[cat].totalPrice;
+      topCategory = cat;
+    }
+  });
+  document.getElementById("overviewTopCategory").textContent = topCategory;
+
+  // Update Category Breakdown
+  updateCategoryBreakdown(categoryStats, totalSpent);
+} */
+
+// Category Breakdown - Top by Price & Qty
+function updateCategoryBreakdown(categoryStats, totalOverallSpent) {
+  const container = document.getElementById("categoryBreakdownContainer");
+  if (!container) return;
+  container.innerHTML = "";
+
+  const statsArray = Object.entries(categoryStats).map(([name, data]) => ({
+    name,
+    totalPrice: data.totalPrice,
+    totalQty: data.totalQty,
+  }));
+
+  // Top 3 by Spending
+  const topByPrice = [...statsArray]
+    .sort((a, b) => b.totalPrice - a.totalPrice)
+    .slice(0, 3);
+
+  if (topByPrice.length > 0) {
+    const header = document.createElement("h4");
+    header.textContent = "Top Spending Categories";
+    header.style.margin = "12px 0 8px";
+    container.appendChild(header);
+
+    topByPrice.forEach((cat) => {
+      const percentage =
+        totalOverallSpent > 0 ? (cat.totalPrice / totalOverallSpent) * 100 : 0;
+      const div = document.createElement("div");
+      div.className = "category-breakdown-item";
+      div.innerHTML = `
+        <div class="category-name">${cat.name}</div>
+        <div class="category-stats">
+          <span>Qty: ${cat.totalQty}</span>
+          <span>$${cat.totalPrice.toFixed(2)}</span>
+        </div>
+        <div class="category-bar-container">
+          <div class="category-bar-fill" style="width: ${percentage}%"></div>
+        </div>
+        <span class="percentage">${percentage.toFixed(0)}%</span>
+      `;
+      container.appendChild(div);
+    });
+  }
+
+  if (statsArray.length === 0) {
+    container.innerHTML = `<p style="text-align:center;color:#999;padding:30px 0;">No items in current range</p>`;
+  }
+}
+
+// ====================== INSIGHTS PAGE - REAL DATA ======================
+/* function updateInsightsPage() {
+  const filteredItems = getFilteredItems();
+
+  let totalSpent = 0;
+  let totalItemsCount = 0;
+  const categoryStats = {};
+
+  filteredItems.forEach(item => {
+    const price = parseFloat(item.price) || 0;
+    const qty = parseInt(item.quantity) || 1;
+    
+    totalSpent += price;
+    totalItemsCount += qty;
+
+    // Category stats
+    const cat = item.category || "Other";
+    if (!categoryStats[cat]) {
+      categoryStats[cat] = { totalPrice: 0, totalQty: 0, count: 0 };
+    }
+    categoryStats[cat].totalPrice += price;
+    categoryStats[cat].totalQty += qty;
+    categoryStats[cat].count += 1;
+  });
+
+  // Update Top Metrics
+  if (insightTotal) insightTotal.textContent = `$${totalSpent.toFixed(2)}`;
+  if (insightItems) insightItems.textContent = `${totalItemsCount} items`;
+  
+  if (insightBudget) {
+    const remaining = budget - totalSpent;
+    insightBudget.textContent = `$${Math.max(0, remaining).toFixed(2)}`;
+  }
+
+  // Top Category
+  let topCategory = "None";
+  let maxValue = 0;
+  
+  Object.keys(categoryStats).forEach(cat => {
+    if (categoryStats[cat].totalPrice > maxValue) {
+      maxValue = categoryStats[cat].totalPrice;
+      topCategory = cat;
+    }
+  });
+
+  if (insightTopCategory) insightTopCategory.textContent = topCategory;
+
+  // Update Category Breakdown
+  updateCategoryBreakdown(categoryStats);
+} */
+
+// ====================== INSIGHTS PAGE - REAL DYNAMIC VALUES ======================
+/* const displayPrice = document.getElementById("displayPrice");
+  const displayQty = document.getElementById("displayQty");
+  const displayAvg = document.getElementById("displayAvg");
+  const displayTopCategory = document.getElementById("displayTopCategory");
+
+  displayPrice.innerHTML= totalSpent; */
+
+function updateInsightsPage() {
+  const filteredItems = getFilteredItems();
+
+  let totalSpent = 0;
+  let totalItemsCount = 0;
+  const categoryStats = {};
+
+  filteredItems.forEach((item) => {
+    const price = parseFloat(item.price) || 0;
+    const qty = parseInt(item.quantity) || 1;
+
+    totalSpent += price;
+    totalItemsCount += qty;
+
+    const cat = (item.category || "Other").trim();
+    if (!categoryStats[cat]) {
+      categoryStats[cat] = { totalPrice: 0, totalQty: 0 };
+    }
+    categoryStats[cat].totalPrice += price;
+    categoryStats[cat].totalQty += qty;
+  });
+
+  document.getElementById("overviewTotalSpent").textContent =
+    `$${totalSpent.toFixed(2)}`;
+  document.getElementById("overviewTotalItems").textContent = totalItemsCount;
+
+  // Budget Used Percentage
+  const budgetUsedPercent =
+    budget > 0 ? Math.min(100, Math.round((totalSpent / budget) * 100)) : 0;
+  document.getElementById("overviewTotalBudget").textContent =
+    `${budgetUsedPercent}%`;
+
+  // Top Category
+  let topCategory = "None";
+  let maxSpent = 0;
+  Object.keys(categoryStats).forEach((cat) => {
+    if (categoryStats[cat].totalPrice > maxSpent) {
+      maxSpent = categoryStats[cat].totalPrice;
+      topCategory = cat;
+    }
+  });
+  document.getElementById("overviewTopCategory").textContent = topCategory;
+
+  const displayPrice = document.getElementById("displayPrice");
+  const displayQty = document.getElementById("displayQty");
+  const displayAvg = document.getElementById("displayAvg");
+  const displayTopCategory = document.getElementById("displayTopCategory");
+
+  displayPrice.innerHTML = totalSpent;
+  displayQty.innerHTML = totalItemsCount;
+  displayAvg.innerHTML = totalSpent / 2;
+  displayTopCategory.innerHTML = topCategory;
+
+  // Update Category Breakdown
+  updateCategoryBreakdown(categoryStats, totalSpent);
+}
+
+// Category Breakdown
+/* function updateCategoryBreakdown(categoryStats, totalOverallSpent) {
+  const container = document.getElementById("categoryBreakdownContainer");
+  if (!container) return;
+  container.innerHTML = "";
+
+  const statsArray = Object.entries(categoryStats).map(([name, data]) => ({
+    name,
+    totalPrice: data.totalPrice,
+    totalQty: data.totalQty
+  }));
+
+  const topByPrice = [...statsArray]
+    .sort((a, b) => b.totalPrice - a.totalPrice)
+    .slice(0, 3);
+
+  if (topByPrice.length > 0) {
+    const header = document.createElement("h4");
+    header.textContent = "Top Spending Categories";
+    header.style.margin = "12px 0 8px";
+    container.appendChild(header);
+
+    topByPrice.forEach(cat => {
+      const percentage = totalOverallSpent > 0 ? (cat.totalPrice / totalOverallSpent) * 100 : 0;
+      const div = document.createElement("div");
+      div.className = "category-breakdown-item";
+      div.innerHTML = `
+        <div class="category-name">${cat.name}</div>
+        <div class="category-stats">
+          <span>Qty: ${cat.totalQty}</span>
+          <span>$${cat.totalPrice.toFixed(2)}</span>
+        </div>
+        <div class="category-bar-container">
+          <div class="category-bar-fill" style="width: ${percentage}%"></div>
+        </div>
+        <span class="percentage">${percentage.toFixed(0)}%</span>
+      `;
+      container.appendChild(div);
+    });
+  }
+
+  if (statsArray.length === 0) {
+    container.innerHTML = `<p style="text-align:center;color:#999;padding:30px 0;">No items in current range</p>`;
+  }
+}
+
+// Helper for Category Breakdown (Top by Price & Quantity)
+function updateCategoryBreakdown(categoryStats) {
+  const container = document.getElementById("categoryBreakdownContainer");
+  if (!container) return;
+
+  container.innerHTML = "";
+
+  // Convert to array and sort
+  const statsArray = Object.entries(categoryStats).map(([name, data]) => ({
+    name,
+    totalPrice: data.totalPrice,
+    totalQty: data.totalQty,
+    count: data.count
+  }));
+
+  // Top 3 by Expense
+  const topByPrice = [...statsArray]
+    .sort((a, b) => b.totalPrice - a.totalPrice)
+    .slice(0, 3);
+
+  // Top 3 by Quantity
+  const topByQty = [...statsArray]
+    .sort((a, b) => b.totalQty - a.totalQty)
+    .slice(0, 3);
+
+  const totalOverall = statsArray.reduce((sum, cat) => sum + cat.totalPrice, 0);
+
+  // Create Breakdown Cards
+  const createBreakdownCard = (cat, type) => {
+    const percentage = totalOverall > 0 ? (cat.totalPrice / totalOverall) * 100 : 0;
+    
+    const div = document.createElement("div");
+    div.className = "category-breakdown-item";
+    div.innerHTML = `
+      <div class="category-name">${cat.name}</div>
+      <div class="category-stats">
+        <span class="qty">Qty: ${cat.totalQty}</span>
+        <span class="price">$${cat.totalPrice.toFixed(2)}</span>
+      </div>
+      <div class="category-bar-container">
+        <div class="category-bar-fill" style="width: ${percentage}%"></div>
+      </div>
+      <span class="percentage">${percentage.toFixed(0)}%</span>
+    `;
+    return div;
+  };
+
+  // Add Top by Price
+  if (topByPrice.length > 0) {
+    const priceHeader = document.createElement("h4");
+    priceHeader.textContent = "Top by Spending";
+    priceHeader.style.margin = "16px 0 8px";
+    container.appendChild(priceHeader);
+
+    topByPrice.forEach(cat => {
+      container.appendChild(createBreakdownCard(cat, "price"));
+    });
+  }
+
+  // Add Top by Quantity
+  if (topByQty.length > 0) {
+    const qtyHeader = document.createElement("h4");
+    qtyHeader.textContent = "Top by Quantity";
+    qtyHeader.style.margin = "16px 0 8px";
+    container.appendChild(qtyHeader);
+
+    topByQty.forEach(cat => {
+      container.appendChild(createBreakdownCard(cat, "qty"));
+    });
+  }
+
+  if (statsArray.length === 0) {
+    container.innerHTML = `<p style="text-align:center; color:#999; padding:20px;">No data in current range</p>`;
+  }
+} */
+
+// ====================== CATEGORY BREAKDOWN - REAL VALUES ======================
+function updateCategoryBreakdown(categoryStats, totalOverallSpent) {
+  const container = document.getElementById("categoryBreakdownContainer");
+  if (!container) return;
+  container.innerHTML = "";
+
+  if (Object.keys(categoryStats).length === 0) {
+    container.innerHTML = `<p style="text-align:center;color:#999;padding:40px 20px;">No items in current range</p>`;
+    return;
+  }
+
+  const statsArray = Object.entries(categoryStats).map(([name, data]) => ({
+    name: name,
+    totalPrice: data.totalPrice,
+    totalQty: data.totalQty,
+  }));
+
+  const totalSpent =
+    totalOverallSpent ||
+    statsArray.reduce((sum, cat) => sum + cat.totalPrice, 0);
+
+  // === 1. CATEGORY WITH MOST ITEMS ===
+  const topByQty = [...statsArray]
+    .sort((a, b) => b.totalQty - a.totalQty)
+    .slice(0, 1)[0];
+
+  if (topByQty) {
+    const percentage =
+      totalSpent > 0 ? (topByQty.totalPrice / totalSpent) * 100 : 0;
+
+    const mostItemsCard = document.createElement("div");
+    mostItemsCard.className = "category-breakdown-item";
+    mostItemsCard.innerHTML = `
+      <div class="cat-name">${topByQty.name}</div>
+      <div class="categorySpending">$${topByQty.totalPrice.toFixed(2)}</div>
+      <div class="categoryNumOfItems">${topByQty.totalQty} items</div>
+      <div class="category-bar-container">
+        <div class="category-bar-fill" style="width: ${percentage}%"></div>
+      </div>
+      <div class="categoryPercentage">${percentage.toFixed(0)}%</div>
+    `;
+    container.appendChild(mostItemsCard);
+
+    const label1 = document.createElement("h4");
+    label1.textContent = "Most Frequent Category";
+    label1.style.margin = "8px 0 4px";
+    label1.style.fontSize = "14px";
+    label1.style.color = "#666";
+    container.appendChild(label1);
+  }
+
+  // === 2. CATEGORY WITH MOST MONEY SPENT ===
+  const topBySpending = [...statsArray]
+    .sort((a, b) => b.totalPrice - a.totalPrice)
+    .slice(0, 1)[0];
+
+  if (topBySpending && topBySpending.name !== topByQty?.name) {
+    const percentage =
+      totalSpent > 0 ? (topBySpending.totalPrice / totalSpent) * 100 : 0;
+
+    const mostSpentCard = document.createElement("div");
+    mostSpentCard.className = "category-breakdown-item";
+    mostSpentCard.innerHTML = `
+      <div class="cat-name">${topBySpending.name}</div>
+      <div class="categorySpending">$${topBySpending.totalPrice.toFixed(2)}</div>
+      <div class="categoryNumOfItems">${topBySpending.totalQty} items</div>
+      <div class="category-bar-container">
+        <div class="category-bar-fill" style="width: ${percentage}%"></div>
+      </div>
+      <div class="categoryPercentage">${percentage.toFixed(0)}%</div>
+    `;
+    container.appendChild(mostSpentCard);
+
+    const label2 = document.createElement("h4");
+    label2.textContent = "Highest Spending Category";
+    label2.style.margin = "8px 0 4px";
+    label2.style.fontSize = "14px";
+    label2.style.color = "#666";
+    container.appendChild(label2);
+  }
+}
+
+// Updated version of getInsightsChartData that accepts filtered items
+function getInsightsChartData() {
+  const aggregated = items.reduce((acc, item) => {
+    const name = item.name.trim();
+    if (!name) return acc;
+    const key = name.toLowerCase();
+    if (!acc[key]) {
+      acc[key] = {
+        name,
+        quantity: 0,
+        expense: 0,
+        uses: 0,
+      };
+    }
+    acc[key].quantity += item.quantity || 0;
+    acc[key].expense += item.price || 0;
+    acc[key].uses += 1;
+    return acc;
+  }, {});
+
+  return Object.values(aggregated)
+    .sort((a, b) => {
+      if (b.quantity !== a.quantity) return b.quantity - a.quantity;
+      if (b.expense !== a.expense) return b.expense - a.expense;
+      return b.uses - a.uses;
+    })
+    .slice(0, 5);
+}
 
 let currentBreakdownOption =
   breakdownByPriceBtn.querySelector("span")?.textContent.trim() ||
@@ -417,93 +1185,157 @@ breakdownOverlay.addEventListener("click", () => {
 
 setBreakdownOption(currentBreakdownOption);
 
-function getInsightsChartData() {
-  const aggregated = items.reduce((acc, item) => {
-    const name = item.name.trim();
-    if (!name) return acc;
-    const key = name.toLowerCase();
-    if (!acc[key]) {
-      acc[key] = {
-        name,
-        quantity: 0,
-        expense: 0,
-        uses: 0,
-      };
-    }
-    acc[key].quantity += item.quantity || 0;
-    acc[key].expense += item.price || 0;
-    acc[key].uses += 1;
-    return acc;
-  }, {});
-
-  return Object.values(aggregated)
-    .sort((a, b) => {
-      if (b.quantity !== a.quantity) return b.quantity - a.quantity;
-      if (b.expense !== a.expense) return b.expense - a.expense;
-      return b.uses - a.uses;
-    })
-    .slice(0, 5);
-}
+// ====================== PROFESSIONAL CHART.JS - UPDATED ======================
+let insightsChart = null;
+let currentChartMode = "amount"; // "amount" or "quantity"
 
 function renderInsightsChart() {
   const canvas = document.getElementById("myChart");
   if (!canvas) return;
 
-  const ctx = canvas.getContext("2d");
-  const rect = canvas.getBoundingClientRect();
-  const dpr = window.devicePixelRatio || 1;
-  const width = Math.max(320, rect.width || 320);
-  const height = Math.max(240, rect.height || 240);
+  const filteredItems = getFilteredItems();
 
-  canvas.width = width * dpr;
-  canvas.height = height * dpr;
-  canvas.style.width = `${width}px`;
-  canvas.style.height = `${height}px`;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, width, height);
+  const aggregated = filteredItems.reduce((acc, item) => {
+    const name = (item.name || "Unknown").trim();
+    if (!name) return acc;
 
-  const chartData = getInsightsChartData();
-  if (!chartData.length) {
-    ctx.fillStyle = "#444";
-    ctx.font = "16px Inter, sans-serif";
-    ctx.fillText("Add items to see ranking chart", 14, 34);
-    return;
+    const key = name.toLowerCase();
+    if (!acc[key]) {
+      acc[key] = { name, quantity: 0, expense: 0 };
+    }
+    acc[key].quantity += parseInt(item.quantity) || 1;
+    acc[key].expense += parseFloat(item.price) || 0;
+    return acc;
+  }, {});
+
+  const chartData = Object.values(aggregated)
+    .sort((a, b) => b.expense - a.expense || b.quantity - a.quantity)
+    .slice(0, 8);
+
+  const labels = chartData.map((item) =>
+    item.name.length > 16 ? item.name.substring(0, 16) + "..." : item.name,
+  );
+
+  const colors = [
+    "#2e7d32",
+    "#1565c0",
+    "#f57c00",
+    "#7b1fa2",
+    "#c2185b",
+    "#0277bd",
+    "#388e3c",
+    "#d32f2f",
+  ];
+
+  if (insightsChart) {
+    insightsChart.destroy();
   }
 
-  const padding = 18;
-  const labelWidth = 130;
-  const rowHeight = (height - padding * 2) / chartData.length;
-  const maxQuantity = Math.max(...chartData.map((item) => item.quantity), 1);
-  const barAreaWidth = width - padding * 2 - labelWidth - 20;
+  const isAmountMode = currentChartMode === "amount";
 
-  chartData.forEach((item, index) => {
-    const y = padding + index * rowHeight;
-    const barWidth = Math.max(8, (item.quantity / maxQuantity) * barAreaWidth);
-
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(padding + labelWidth, y + 8, barWidth, rowHeight * 0.4);
-
-    ctx.fillStyle = "#111";
-    ctx.font = "600 13px Inter, sans-serif";
-    ctx.textAlign = "left";
-    ctx.fillText(`${index + 1}. ${item.name}`, padding, y + 16);
-
-    ctx.font = "12px Inter, sans-serif";
-    ctx.fillStyle = "#555";
-    ctx.fillText(
-      `Qty ${item.quantity} · $${item.expense.toFixed(2)} · Uses ${item.uses}`,
-      padding,
-      y + 34,
-    );
+  insightsChart = new Chart(canvas, {
+    type: "bar",
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: isAmountMode ? "Amount Spent ($)" : "Quantity",
+          data: isAmountMode
+            ? chartData.map((item) => item.expense)
+            : chartData.map((item) => item.quantity),
+          backgroundColor: chartData.map((_, i) => colors[i % colors.length]),
+          borderColor: "#ffffff",
+          borderWidth: 2,
+          borderRadius: 8,
+          barThickness: 34,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: "rgba(15,23,42,0.95)",
+          titleColor: "#fff",
+          bodyColor: "#e2e8f0",
+          callbacks: {
+            label: (ctx) =>
+              isAmountMode
+                ? `$${parseFloat(ctx.raw).toFixed(2)}`
+                : `${ctx.raw} items`,
+          },
+        },
+      },
+      scales: {
+        x: {
+          grid: { color: "#e2e8f0", lineWidth: 1 },
+          ticks: {
+            font: { size: 11.5 },
+            color: "#64748b",
+            maxRotation: 60,
+            minRotation: 60,
+          },
+        },
+        y: {
+          position: "left",
+          grid: { color: "#e2e8f0", lineWidth: 1.5, drawBorder: false },
+          ticks: {
+            font: { size: 13 },
+            color: "#475569",
+            callback: (value) => (isAmountMode ? "$" + value : value),
+            stepSize: isAmountMode ? undefined : 1,
+          },
+          border: { dash: [4, 3] },
+        },
+      },
+      animation: { duration: 850, easing: "easeOutQuart" },
+    },
   });
+}
 
-  ctx.fillStyle = "#777";
-  ctx.font = "600 12px Inter, sans-serif";
-  ctx.fillText(
-    "Top 5 ranked items by quantity, expense, and usage",
-    padding,
-    height - 10,
-  );
+// ====================== CHART TOGGLE - INSIDE CHART CONTAINER ======================
+function setupChartToggle() {
+  const chartContainer = document.querySelector(".chart-container");
+  if (!chartContainer) return;
+
+  let chartToggle = document.getElementById("chartToggle");
+
+  if (!chartToggle) {
+    chartToggle = document.createElement("div");
+    chartToggle.id = "chartToggle";
+    chartToggle.style.cssText = `
+      position: absolute;
+      top: -45px;
+      right: 16px;
+      background: white;
+      padding: 6px 15px;
+      border-radius: 9999px;
+      font-size: 13.2px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.12);
+      border: 1px solid #e2e8f0;
+      z-index: 25;
+      user-select: none;
+      transition: all 0.2s ease;
+    `;
+    chartToggle.textContent = "Amount";
+    chartContainer.style.position = "relative"; // Important
+    chartContainer.appendChild(chartToggle);
+  }
+
+  // Prevent duplicate listeners
+  const cleanToggle = chartToggle.cloneNode(true);
+  chartToggle.parentNode.replaceChild(cleanToggle, chartToggle);
+
+  cleanToggle.addEventListener("click", () => {
+    currentChartMode = currentChartMode === "amount" ? "quantity" : "amount";
+    cleanToggle.textContent =
+      currentChartMode === "amount" ? "Amount" : "Quantity";
+    renderInsightsChart();
+  });
 }
 
 // ===== FAVORITES MANAGEMENT =====
@@ -632,6 +1464,406 @@ function getRecipeImage(recipeName, category) {
   return images[category] || images.meal;
 }
 
+function debounce(fn, wait = 300) {
+  let timeout;
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => fn(...args), wait);
+  };
+}
+
+function showRecipeLoading(show) {
+  if (!recipeLoading) return;
+  recipeLoading.style.display = show ? "flex" : "none";
+}
+
+function setRecipeTrendingVisible(show) {
+  if (!recipeTrending) return;
+  recipeTrending.style.display = show ? "block" : "none";
+}
+
+function renderRecipeCards(recipes) {
+  if (!recipeList) return;
+  currentRecipeResults = recipes;
+
+  recipeList.innerHTML = recipes
+    .map(
+      (recipe) => `
+      <div class="recipe-item" data-recipe-id="${recipe.id}">
+        <div class="meal" style="background-image: url('${recipe.image || getRecipeImage(recipe.name, recipe.category || "meal")}'); background-size: cover; background-position: center;"></div>
+        <div class="meal-details">
+          <div class="meal-name-tab">
+            <div class="meal-name">
+              ${recipe.name}
+              <div class="place-of-recipe"><i>${recipe.origin || "Unknown"}</i></div>
+            </div>
+            <div class="meal-actions">
+              <div class="like-item" data-type="recipe" data-name="${recipe.name}" data-origin="${recipe.origin || "Unknown"}">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+                  <path fill="currentColor" d="m8.962 18.91l.464-.588zM12 5.5l-.54.52a.75.75 0 0 0 1.08 0zm3.038 13.41l.465.59zm-5.612-.588C7.91 17.127 6.253 15.96 4.938 14.48C3.65 13.028 2.75 11.335 2.75 9.137h-1.5c0 2.666 1.11 4.7 2.567 6.339c1.43 1.61 3.254 2.9 4.68 4.024zM2.75 9.137c0-2.15 1.215-3.954 2.874-4.713c1.612-.737 3.778-.541 5.836 1.597l1.08-1.04C10.1 2.444 7.264 2.025 5 3.06C2.786 4.073 1.25 6.425 1.25 9.137zM8.497 19.5c.513.404 1.063.834 1.62 1.16s1.193.59 1.883.59v-1.5c-.31 0-.674-.12-1.126-.385c-.453-.264-.922-.628-1.448-1.043zm7.006 0c1.426-1.125 3.25-2.413 4.68-4.024c1.457-1.64 2.567-3.673 2.567-6.339h-1.5c0 2.198-.9 3.891-2.188 5.343c-1.315 1.48-2.972 2.647-4.488 3.842zM22.75 9.137c0-2.712-1.535-5.064-3.75-6.077c-2.264-1.035-5.098-.616-7.54 1.92l1.08 1.04c2.058-2.137 4.224-2.333 5.836-1.596c1.659.759 2.874 2.562 2.874 4.713zm-8.176 9.185c-.526.415-.995.779-1.448 1.043s-.816.385-1.126.385v1.5c.69 0 1.326-.265 1.883-.59c.558-.326 1.107-.756 1.62-1.16z" />
+                </svg>
+              </div>
+              <div class="expand-item">
+                <svg class="icon-chevron" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 1024 1024">
+                  <path fill="currentColor" d="M104.7 685.2a64 64 0 0 0 90.5 0L512 368.4l316.8 316.8a64 64 0 0 0 90.5-90.4l-362-362.1a64 64 0 0 0-90.5 0l-362.1 362a64 64 0 0 0 0 90.5" />
+                </svg>
+              </div>
+            </div>
+          </div>
+          <div class="meal-more-details" style="display: none;">
+            <div class="recipe-info">
+              <div class="row">
+                <div class="recipe-info-item">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+                    <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5">
+                      <path d="M2 12c0 5.523 4.477 10 10 10s10-4.477 10-10S17.523 2 12 2" />
+                      <path stroke-linejoin="round" d="M12 9v4h4" opacity="0.5" />
+                      <circle cx="12" cy="12" r="10" stroke-dasharray=".5 3.5" opacity="0.5" />
+                    </g>
+                  </svg>
+                  <p>${recipe.prepTime || "20 min"}</p>
+                </div>
+                <div class="recipe-info-item">
+                  <svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" viewBox="0 0 512 512">
+                    <path d="M224 448s-32 0-32-32 32-128 160-128 160 96 160 128-32 32-32 32zm128-192c53 0 96-43 96-96s-43-96-96-96-96 43-96 96 43 96 96 96M166.9 448c-4.8-10-7.1-20.9-6.9-32 0-43.4 21.8-88 62-119-20.1-6.2-41-9.2-62-9C32 288 0 384 0 416s32 32 32 32zM144 256c44.2 0 80-35.8 80-80s-35.8-80-80-80-80 35.8-80 80 35.8 80 80 80" style="fill-rule:evenodd;clip-rule:evenodd" />
+                  </svg>
+                  <p>${recipe.servings || "4"} servings</p>
+                </div>
+              </div>
+            </div>
+            <div class="recipe-ingredients-tab">
+              <h3>Ingredients</h3>
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                ${(recipe.ingredients || [])
+                  .slice(0, 6)
+                  .map(
+                    (ing) =>
+                      `<div class="ingredient"><p>${safeText(ing)}</p></div>`,
+                  )
+                  .join("")}
+              </div>
+            </div>
+            <button class="recipe-prepare-btn" data-recipe-id="${recipe.id}" style="margin-top: 12px; padding: 10px 16px; background: #4caf50; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">Prepare</button>
+          </div>
+        </div>
+      </div>
+    `,
+    )
+    .join("");
+
+  initializeRecipeExpansion();
+}
+
+function initializeRecipeExpansion() {
+  document.querySelectorAll(".recipe-item").forEach((recipe) => {
+    if (recipe.dataset.expansionInit) return;
+    recipe.dataset.expansionInit = "true";
+
+    const expandBtn = recipe.querySelector(".expand-item");
+    if (expandBtn) {
+      expandBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        recipe.classList.toggle("expand");
+      });
+    }
+
+    const prepareBtn = recipe.querySelector(".recipe-prepare-btn");
+    if (prepareBtn) {
+      prepareBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const recipeId = prepareBtn.dataset.recipeId;
+        const recipeData = currentRecipeResults.find(
+          (item) => normalizeRecipeId(item.id) === normalizeRecipeId(recipeId),
+        );
+        if (recipeData) {
+          openMakeRecipePage(recipeData);
+        }
+      });
+    }
+  });
+}
+
+function normalizeRecipeId(id) {
+  return String(id || "").trim();
+}
+
+async function fetchMealDbRecipes(query) {
+  try {
+    const response = await fetch(
+      `https://www.themealdb.com/api/json/v1/1/search.php?s=${encodeURIComponent(query)}`,
+    );
+    const data = await response.json();
+    if (!data?.meals) return [];
+    return data.meals.map((meal) => ({
+      id: meal.idMeal || meal.strMeal,
+      name: meal.strMeal,
+      origin: meal.strArea || meal.strCategory || "TheMealDB",
+      category: getRecipeCategory(meal.strMeal),
+      image:
+        meal.strMealThumb ||
+        getRecipeImage(meal.strMeal, getRecipeCategory(meal.strMeal)),
+      ingredients: Array.from({ length: 20 })
+        .map((_, index) => meal[`strIngredient${index + 1}`])
+        .filter(Boolean)
+        .map((item, index) => {
+          const measure = meal[`strMeasure${index + 1}`] || "";
+          return `${item.trim()}${measure ? ` (${measure.trim()})` : ""}`;
+        }),
+      source: meal.strSource || "TheMealDB",
+    }));
+  } catch (error) {
+    console.warn("MealDB fetch failed", error);
+    return [];
+  }
+}
+
+async function fetchRecipePuppyRecipes(query) {
+  try {
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(
+      `http://www.recipepuppy.com/api/?q=${encodeURIComponent(query)}`,
+    )}`;
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    if (!data?.results) return [];
+    return data.results.map((item, index) => ({
+      id: item.href || `${item.title}-${index}`,
+      name: item.title?.trim() || `Recipe ${index + 1}`,
+      origin: "RecipePuppy",
+      category: getRecipeCategory(item.title || "recipe"),
+      image:
+        item.thumbnail ||
+        getRecipeImage(
+          item.title || "recipe",
+          getRecipeCategory(item.title || "recipe"),
+        ),
+      ingredients: item.ingredients
+        ? item.ingredients
+            .split(",")
+            .map((text) => text.trim())
+            .filter(Boolean)
+        : [],
+      source: item.href,
+    }));
+  } catch (error) {
+    console.warn("RecipePuppy fetch failed", error);
+    return [];
+  }
+}
+
+function createRecipeFallback(query) {
+  const clean = query.trim() || "Meal";
+  return [
+    {
+      id: `fallback-${clean}`,
+      name: `${clean} Bowl`,
+      origin: "Local fallback",
+      category: "meal",
+      image: getRecipeImage(clean, "meal"),
+      ingredients: ["Main ingredient", "Salt", "Pepper", "Oil"],
+      source: "PlanUp suggestion",
+    },
+  ];
+}
+
+async function fetchRecipes(query) {
+  const results = [];
+  const mealDb = await fetchMealDbRecipes(query);
+  if (mealDb.length) results.push(...mealDb);
+  const puppy = await fetchRecipePuppyRecipes(query);
+  if (puppy.length) results.push(...puppy);
+  if (!results.length) {
+    return createRecipeFallback(query);
+  }
+  const unique = new Map();
+  results.forEach((recipe) => {
+    const key =
+      normalizeRecipeId(recipe.id) || `${recipe.name}-${recipe.origin}`;
+    if (!unique.has(key)) unique.set(key, recipe);
+  });
+  return Array.from(unique.values()).slice(0, 20);
+}
+
+async function searchRecipes(query) {
+  if (!recipeList) return;
+  showRecipeLoading(true);
+  setRecipeTrendingVisible(false);
+  const results = await fetchRecipes(query || "chicken");
+  renderRecipeCards(results);
+  showRecipeLoading(false);
+  setRecipeTrendingVisible(results.length === 0);
+}
+
+function getGeminiKey() {
+  return localStorage.getItem("GEMINI_API_KEY") || "";
+}
+
+function safeText(text) {
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function parsePreparationSteps(responseText) {
+  return responseText
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^\s*\d+[\).\s]+/, "").trim())
+    .filter(Boolean);
+}
+
+async function fetchPreparationFromAI(recipe) {
+  const apiKey = getGeminiKey();
+  if (!apiKey) {
+    throw new Error("No Gemini key configured.");
+  }
+
+  const prompt = `Create a clear cooking preparation plan for ${recipe.name} using these ingredients: ${
+    recipe.ingredients?.slice(0, 8).join(", ") || "your available ingredients"
+  }. Return only numbered steps, each on its own line. Keep each step clear and concise.`;
+
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${encodeURIComponent(apiKey)}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: prompt,
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 400,
+          },
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(`Gemini API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const content = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    if (!content) {
+      throw new Error("No content from Gemini");
+    }
+    return parsePreparationSteps(content);
+  } catch (error) {
+    console.warn("Gemini fetch failed", error);
+    throw error;
+  }
+}
+
+function generatePreparationFallback(recipe) {
+  const ingredients = recipe.ingredients || [];
+  return [
+    `Gather all ingredients: ${ingredients.slice(0, 6).join(", ")}${ingredients.length > 6 ? ", and more" : ""}.`,
+    "Wash and prepare fresh produce. Chop vegetables into bite-sized pieces.",
+    "Heat oil in a pan over medium heat. Add aromatics first if available.",
+    "Add the main protein or hearty vegetables. Cook until partially done.",
+    "Add remaining ingredients and seasonings. Stir well.",
+    "Simmer on medium heat until everything is cooked through and tender.",
+    "Taste and adjust seasonings as needed. Serve hot while fresh.",
+  ];
+}
+
+function showMakeRecipeLoading(show) {
+  if (!prepareLoading) return;
+  prepareLoading.style.display = show ? "block" : "none";
+}
+
+function renderPreparationSteps(steps) {
+  if (!makeRecipeSteps) return;
+  if (!steps || !steps.length) {
+    makeRecipeSteps.innerHTML =
+      '<li><div class="recipe-preparation-reference"></div>No preparation steps available.</li>';
+    return;
+  }
+  makeRecipeSteps.innerHTML = steps
+    .map(
+      (step) => `
+      <li>
+        <div class="recipe-preparation-reference"></div>
+        ${safeText(step)}
+      </li>
+    `,
+    )
+    .join("");
+}
+
+async function generateRecipePreparation(recipe) {
+  showMakeRecipeLoading(true);
+  try {
+    const steps = getGeminiKey()
+      ? await fetchPreparationFromAI(recipe)
+      : generatePreparationFallback(recipe);
+    renderPreparationSteps(steps);
+  } catch (error) {
+    console.warn("Preparation generation failed", error);
+    renderPreparationSteps(generatePreparationFallback(recipe));
+  } finally {
+    showMakeRecipeLoading(false);
+  }
+}
+
+function updateMakeRecipePage(recipe) {
+  selectedRecipe = recipe;
+  if (makeRecipeName) makeRecipeName.textContent = recipe.name || "Recipe";
+  if (makeRecipeOrigin)
+    makeRecipeOrigin.textContent = recipe.origin || "Unknown cuisine";
+  if (makeRecipeTechnique)
+    makeRecipeTechnique.textContent = recipe.category
+      ? recipe.category.charAt(0).toUpperCase() + recipe.category.slice(1)
+      : "Cooking";
+  if (makeRecipeServings)
+    makeRecipeServings.textContent = recipe.servings || "4";
+  if (makeRecipePrepTime)
+    makeRecipePrepTime.textContent = recipe.prepTime || "15 min";
+  if (makeRecipeCookTime)
+    makeRecipeCookTime.textContent = recipe.cookTime || "20 min";
+  if (makeRecipeMatchText)
+    makeRecipeMatchText.textContent =
+      recipe.matchText || "Ingredients match: 100%";
+
+  if (makeRecipeIngredientsList) {
+    makeRecipeIngredientsList.innerHTML = (recipe.ingredients || [])
+      .map((ingredient) => `<li>${safeText(ingredient)}</li>`)
+      .join("");
+  }
+
+  if (makeRecipeMissingList) {
+    makeRecipeMissingList.innerHTML = (recipe.missing || [])
+      .map((item) => `<li>${safeText(item)}</li>`)
+      .join("");
+  }
+
+  if (makeRecipeMethodTitle) {
+    makeRecipeMethodTitle.textContent = `Preparation for ${recipe.name}`;
+  }
+
+  renderPreparationSteps([
+    `Press Prepare to generate steps for ${recipe.name}.`,
+  ]);
+}
+
+function openMakeRecipePage(recipe) {
+  if (!makeRecipePage) return;
+  updateMakeRecipePage(recipe);
+  makeRecipePage.classList.add("show");
+  generateRecipePreparation(recipe);
+}
+
 function addFavorite(type, name, origin = "") {
   const favorites = getFavorites();
   const category = type === "recipe" ? getRecipeCategory(name) : "";
@@ -697,7 +1929,7 @@ function displayFavorites() {
     favRecipesContainer.innerHTML = "";
     if (favorites.recipes.length === 0) {
       favRecipesContainer.innerHTML =
-        '<div style="padding: 20px; text-align: center; color: #999;">No favourite recipes yet</div>';
+        '<div style="padding: 20px; text-align: center; color: #d6d6d6; margin-top: 50%;">No favourite recipes yet</div>';
     } else {
       favorites.recipes.forEach((recipe) => {
         const recipeEl = createFavRecipeElement(recipe);
@@ -710,7 +1942,7 @@ function displayFavorites() {
     favIngredientsContainer.innerHTML = "";
     if (favorites.ingredients.length === 0) {
       favIngredientsContainer.innerHTML =
-        '<div style="padding: 20px; text-align: center; color: #999;">No favourite ingredients yet</div>';
+        '<div style="padding: 20px; text-align: center; color: #d6d6d6; margin-top: 50%;">No favourite ingredients yet</div>';
     } else {
       favorites.ingredients.forEach((ingredient) => {
         const ingredientEl = createFavIngredientElement(ingredient);
@@ -944,11 +2176,14 @@ expandRecipe.forEach((arrow) => {
     });
   });
 }); */
-recipeItem.forEach((recipe) => {
-  recipe.addEventListener("click", () => {
-    recipe.classList.toggle("expand");
+function initializeRecipeExpansion() {
+  document.querySelectorAll(".recipe-item").forEach((recipe) => {
+    if (recipe.dataset.expansionInit) return;
+    recipe.dataset.expansionInit = "true";
+    recipe.addEventListener("click", () => recipe.classList.toggle("expand"));
   });
-});
+}
+initializeRecipeExpansion();
 
 //Profile Page
 document.getElementById("navProfiles").onclick = () => {
@@ -958,7 +2193,7 @@ document.getElementById("navProfiles").onclick = () => {
 
   navProfiles.classList.add("active");
   profilePage.classList.add("show");
-  navMyItems.classList.remove("active");
+  navInventory.classList.remove("active");
   homePage.classList.add("hide");
   navInsights.classList.remove("active");
   insightsPage.classList.remove("show");
@@ -1021,8 +2256,29 @@ const profileAvatar = document.getElementById("profileAvatar");
 
 const settingsIcon = document.getElementById("settingsIcon");
 const settingsPage = document.getElementById("settingsPage");
+const geminiKeyInput = document.getElementById("geminiKeyInput");
 
 const dataMangementToggle = document.getElementById("dataMangementToggle");
+const settingsBtn = document.getElementById("settingsBtn");
+
+// Load Gemini key from localStorage if available
+if (geminiKeyInput) {
+  const savedKey = localStorage.getItem("GEMINI_API_KEY");
+  if (savedKey) {
+    geminiKeyInput.value = savedKey;
+  }
+
+  geminiKeyInput.addEventListener("change", () => {
+    const key = geminiKeyInput.value.trim();
+    if (key) {
+      localStorage.setItem("GEMINI_API_KEY", key);
+      showToast("✓ API key saved");
+    } else {
+      localStorage.removeItem("GEMINI_API_KEY");
+      showToast("✗ API key cleared");
+    }
+  });
+}
 
 settingsIcon.addEventListener("click", () => {
   settingsPage.classList.add("show");
@@ -1073,19 +2329,32 @@ currencyOptions.forEach((option) => {
 
 const deleteActions = document.querySelectorAll("#deleteAction");
 const deletePanel = document.getElementById("deletePanel");
+const scrollHandler = document.querySelector(".scroll-handler");
+const deletePanelOverlay = document.getElementById("deletePanelOverlay");
 
 // Attach handler to all delete action buttons (some pages may duplicate the id)
+scrollHandler.addEventListener("click", () => {
+  deletePanel.classList.remove("show");
+  deletePanelOverlay.classList.remove("show");
+});
+
 if (deleteActions && deleteActions.length) {
   deleteActions.forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
-      showDeletePanel();
+      // showDeletePanel();
+      deletePanel.classList.add("show");
+      deletePanelOverlay.classList.add("show");
     });
+  });
+  deletePanelOverlay.addEventListener("click", () => {
+    deletePanel.classList.remove("show");
+    deletePanelOverlay.classList.remove("show");
   });
 }
 
 // Create and manage a modal overlay for delete confirmation
-let _deleteOverlay = null;
+/* let _deleteOverlay = null;
 function ensureDeleteOverlay() {
   if (_deleteOverlay) return _deleteOverlay;
   _deleteOverlay = document.createElement("div");
@@ -1098,7 +2367,7 @@ function ensureDeleteOverlay() {
     right: "0",
     bottom: "0",
     background: "rgba(0,0,0,0.45)",
-    zIndex: "9997",
+    zIndex: "99",
     display: "none",
     opacity: "0",
     transition: "opacity 180ms ease-in-out",
@@ -1108,17 +2377,16 @@ function ensureDeleteOverlay() {
     closeDeletePanel();
   });
   return _deleteOverlay;
-}
+} */
 
-function showDeletePanel() {
-  // Close settings page if open
-  if (settingsPage) settingsPage.classList.remove("show");
+/*function showDeletePanel() {
+   if (settingsPage) settingsPage.classList.remove("show");
   // Ensure overlay exists and show
   ensureDeleteOverlay();
   // show overlay (inline styles) - set z-index higher than overlay
   if (_deleteOverlay) {
     _deleteOverlay.style.display = "block";
-    _deleteOverlay.style.zIndex = "9997";
+    _deleteOverlay.style.zIndex = "99";
     setTimeout(() => (_deleteOverlay.style.opacity = "1"), 20);
   }
 
@@ -1127,7 +2395,7 @@ function showDeletePanel() {
     // Ensure panel is on top of overlay
     deletePanel.style.position = "relative";
     deletePanel.style.zIndex = "9999";
-  }
+  } 
 
   // Find confirm button and attach input creation to button click
   const confirmBtn = document.getElementById("confirmDeleteAction");
@@ -1141,7 +2409,7 @@ function showDeletePanel() {
       if (!input) {
         input = document.createElement("input");
         input.id = "confirmDeleteInput";
-        input.placeholder = 'Type "clear" to enable deletion';
+        input.placeholder = 'Type "clear" to confirm delete';
         input.className = "confirm-delete-input";
         input.style.marginBottom = "10px";
         const instructions = document.createElement("div");
@@ -1199,9 +2467,9 @@ function showDeletePanel() {
       }
     };
   }
-}
+}*/
 
-function closeDeletePanel() {
+/* function closeDeletePanel() {
   if (deletePanel) deletePanel.classList.remove("show");
   if (_deleteOverlay) {
     _deleteOverlay.style.opacity = "0";
@@ -1223,7 +2491,7 @@ function closeDeletePanel() {
   }
   const confirmBtn = document.getElementById("confirmDeleteAction");
   if (confirmBtn) confirmBtn.disabled = true;
-}
+} */
 
 const faqBox = document.querySelector(".faqs-box");
 const faqNAnsWrapper = document.querySelector(".faq-n-ans-wrapper");
@@ -1287,9 +2555,94 @@ showMoreFaqs.addEventListener("click", () => {
 const cancelAction = document.getElementById("cancelAction");
 const confirmDeleteAction = document.getElementById("confirmDeleteAction");
 
+const confirmDelete = document.createElement("div");
+confirmDelete.id = "confirmDelete";
+confirmDelete.innerHTML = `
+      <input type="text" id="confirmDeleteInput" placeholder="'clear'">;
+      <div class="delete-instruction">
+        <p>Type "clear" to confirm delete.</p>
+      </div>
+      <button id="clearDataBtn">Delete</button>
+      <div class="delete-notice">
+        <p>This action cannot be reversed!</p>
+      </div>
+    `;
+const confirmDeleteInput = document.getElementById("confirmDeleteInput");
+const clearDataBtn = document.getElementById("clearDataBtn");
+
+function onDeleteClick() {
+  // Create input if it doesn't exist yet
+  // let input = deletePanel.querySelector("#confirmDeleteInput");
+  // if (!input) {
+  const confirmDelete = document.createElement("div");
+  confirmDelete.id = "confirmDelete";
+  confirmDelete.innerHTML = `
+      <input type="text" id="confirmDeleteInput" placeholder="'clear'">;
+      <div class="delete-instruction">
+        <p>Type "clear" to confirm delete.</p>
+      </div>
+      <button id="clearDataBtn">Delete</button>
+      <div class="delete-notice">
+        <p>This action cannot be reversed!</p>
+      </div>
+    `;
+  document.body.appendChild(confirmDelete);
+  const confirmDeleteInput = document.getElementById("confirmDeleteInput");
+  const clearDataBtn = document.getElementById("clearDataBtn");
+
+  /* input = document.createElement("input");
+  input.id = "confirmDeleteInput";
+  input.placeholder = 'Type "clear" to confirm delete';
+  input.className = "confirm-delete-input";
+  input.style.marginBottom = "10px";
+  const instructions = document.createElement("div");
+  instructions.className = "confirm-delete-instructions";
+  instructions.textContent =
+    'Type "clear" (without quotes) to confirm clearing all data.';
+  instructions.style.marginBottom = "10px";
+  instructions.style.fontSize = "12px";
+  // Insert above the confirm button
+  confirmDeleteAction.parentNode.insertBefore(instructions, confirmDeleteAction);
+  confirmDeleteAction.parentNode.insertBefore(input, confirmDeleteAction); */
+
+  // Attach input listener for case-sensitive 'clear'
+  /* const onInput = (e) => {
+    const val = e.target.value.trim();
+    confirmDeleteAction.disabled = val !== "clear";
+  };
+  input._deleteInputListener = onInput;
+  input.addEventListener("input", onInput); */
+  // }
+  // Focus the input
+  // input.focus();
+
+  return;
+}
+
+confirmDeleteAction.addEventListener("click", onDeleteClick);
+/* clearDataBtn.addEventListener("click", () => {
+  if (confirmDeleteInput.value.trim() === "clear") {
+    
+    clearDataBtn.addEventListener("click", () => {
+        localStorage.clear();
+      showToast("All data cleared.");
+      confirmDelete.remove();
+      closeDeletePanel();
+      setTimeout(() => location.reload(), 300);
+      profilePage.style.backgroundColor = "red";
+      console.log("Must clear data!");
+    })
+  }
+}) */
+
 cancelAction.addEventListener("click", () => {
   closeDeletePanel();
 });
+
+function closeDeletePanel() {
+  deletePanel.classList.remove("show");
+  deletePanelOverlay.classList.remove("show");
+}
 
 // ===== MENU =====
 menuBtn.addEventListener("click", () => {
@@ -1311,12 +2664,78 @@ notificationBar?.addEventListener("click", () => {
   showNotificationPage();
 });
 
+// ===== TO-GET LIST HANDLERS - FIXED =====
+const toGetListPage = document.getElementById("toGetListPage");
+// const backFromToGetListBtn = document.getElementById("backFromToGetList");
+const addFromRecipeBtn = document.getElementById("addFromRecipeBtn"); // or querySelector if needed
+
+// Close To-Get List Page
+function closeToGetListPage() {
+  if (toGetListPage) {
+    toGetListPage.classList.remove("show");
+    // toGetListPage.style.transform = "scale(1)";
+  }
+  closeToGetModal();
+  closeToGetItemModal();
+}
+
+// Back Button Handler
+const backFromToGetListBtn = document.getElementById("backFromToGetList");
+
+if (backFromToGetListBtn) {
+  backFromToGetListBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    closeToGetListPage();
+  });
+} else {
+  console.warn("backFromToGetList button not found in DOM");
+}
+
+// Add From Recipe Button
+if (addFromRecipeBtn) {
+  addFromRecipeBtn.addEventListener("click", (e) => {
+    if (toGetListPage.classList.contains("show")) {
+      e.stopPropagation();
+      // closeToGetListPage();
+      toGetListPage.style.transform = "translateX(100%)";
+      openRecipePage();
+    } // Make sure this function exists
+  });
+}
+
+let editingToGetItemId = null;
+
+// ===== CLEAN CLOSE MODAL FUNCTION =====
+function closeToGetModal() {
+  editingToGetItemId = null;
+
+  const addToGetModal = document.getElementById("addToGetModal");
+  const toGetModalOverlay = document.getElementById("toGetModalOverlay");
+
+  if (addToGetModal) addToGetModal.classList.remove("show");
+  if (toGetModalOverlay) toGetModalOverlay.classList.remove("show");
+
+  // Optional: Reset form fields
+  clearToGetModalFields();
+}
+
+// Also define the item modal closer if not already
+function closeToGetItemModal() {
+  const toGetItemModal = document.querySelector(".to-get-item-modal");
+  if (toGetItemModal) toGetItemModal.classList.remove("show");
+}
+
+window.closeToGetItemModal = function () {
+  const toGetItemModal = document.querySelector(".to-get-item-modal");
+  if (toGetItemModal) toGetItemModal.classList.remove("show");
+};
+
 // ===== BACK BUTTONS =====
+// ===== BACK BUTTONS & TO-GET LIST HANDLERS =====
 const backFromPage = document.querySelectorAll(".back-btn");
 
 function closePage() {
   if (notificationPage) notificationPage.classList.remove("show");
-  if (toGetListPage) toGetListPage.classList.remove("show");
   if (favoritesPage) favoritesPage.classList.remove("show");
   if (scheduledPage) scheduledPage.classList.remove("show");
   if (historyPage) historyPage.classList.remove("show");
@@ -1326,8 +2745,13 @@ function closePage() {
   if (makeRecipePage) makeRecipePage.classList.remove("show");
   menuPage.classList.remove("show");
   menuOverlay.classList.remove("show");
+
   if (typeof closeToGetModal === "function") {
     closeToGetModal();
+  }
+
+  if (typeof closeToGetItemModal === "function") {
+    closeToGetItemModal();
   }
 }
 
@@ -1346,28 +2770,13 @@ const addToGet = document.getElementById("addToGet");
 const addToGetModal = document.getElementById("addToGetModal");
 const toGetModalOverlay = document.getElementById("toGetModalOverlay");
 const addToGetBtn = document.getElementById("addToGetBtn");
-const addFromRecipeBtn = document.querySelector("#addFromRecipeBtn");
+// const addFromRecipeBtn = document.querySelector("#addFromRecipeBtn");
 const toGetItemName = document.querySelector("#toGetItemName");
 const toGetItemQty = document.querySelector("#toGetItemQty");
 const toGetItemPrice = document.querySelector("#toGetItemPrice");
 const toGetItemStore = document.querySelector("#toGetItemStore");
 const TO_GET_STORAGE_KEY = "planup_to_get_items";
-let editingToGetItemId = null;
 
-if (addToGet) {
-  addToGet.addEventListener("click", () => {
-    editingToGetItemId = null;
-    addToGetModal?.classList.add("show");
-    toGetModalOverlay?.classList.add("show");
-    if (toGetListPage) toGetListPage.style.transform = "scale(1.01)";
-  });
-}
-function closeToGetModal() {
-  editingToGetItemId = null;
-  addToGetModal?.classList.remove("show");
-  toGetModalOverlay?.classList.remove("show");
-  if (toGetListPage) toGetListPage.style.transform = "scale(1)";
-}
 if (toGetModalOverlay) {
   toGetModalOverlay.addEventListener("click", closeToGetModal);
 }
@@ -1394,7 +2803,7 @@ function createToGetItemElement(item) {
   div.dataset.itemId = item.id;
   div.innerHTML = `
     <div class="to-get-item-icon">
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M18 8h1a3 3 0 0 1 0 6h-1v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8h12Zm-2 7h1a1 1 0 0 0 0-2h-1v2Zm-8-9V4h8v2H8Zm-2 0H4V4a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v4H6Zm2 0h8V6H10v2Z"/></svg>
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M6 19h12a2 2 0 0 0 2-2v-6a6 6 0 0 0-12 0v6a2 2 0 0 0 2 2Zm-2-8h14a1 1 0 0 1 1 1v2H3v-2a1 1 0 0 1 1-1Zm9-7a2 2 0 0 1 2 2v1h-2V6h-2v2h-2V6h-2v2H8V6a2 2 0 0 1 2-2h3Zm-6 6h10v1H7v-1Z"/></svg>
     </div>
     <div class="to-get-item-details">
       <div class="to-get-item-name">${item.name}</div>
@@ -1537,6 +2946,15 @@ if (document) {
   });
 }
 
+if (addToGet) {
+  addToGet.addEventListener("click", () => {
+    editingToGetItemId = null;
+    addToGetModal?.classList.add("show");
+    toGetModalOverlay?.classList.add("show");
+    // if (toGetListPage) toGetListPage.style.transform = "scale(1.01)";
+  });
+}
+
 if (addToGetBtn) {
   addToGetBtn.addEventListener("click", () => {
     const name = toGetItemName?.value.trim() || "";
@@ -1584,31 +3002,6 @@ if (addToGetBtn) {
   });
 }
 
-if (addFromRecipeBtn) {
-  addFromRecipeBtn.addEventListener("click", () => {
-    closeToGetModal();
-    closePage();
-    if (typeof openRecipePage === "function") {
-      openRecipePage();
-    } else {
-      console.error("openRecipePage is not defined.");
-    }
-    console.log("Navigating to recipe page from to-get list");
-  });
-}
-
-/*  addFromRecipeBtn.addEventListener("click", () => {
-   closeModal(); // Hide modal so back button works again
-   
-   // Ensure these two functions are actually defined in your script!
-   if (typeof closePage === "function" && typeof openRecipePage === "function") {
-     closePage();
-     openRecipePage();
-   } else {
-     console.error("closePage or openRecipePage is not defined.");
-   }
- }); */
-
 const addIngredient = document.querySelectorAll(".add-ingredient");
 
 addIngredient.forEach((add) => {
@@ -1617,13 +3010,18 @@ addIngredient.forEach((add) => {
   });
 });
 
-const prepareRecipeButton = document.getElementById("prepareRecipeButton");
-const makeRecipePage = document.getElementById("makeRecipePage");
+const recipePage = document.getElementById("recipePage");
 
-prepareRecipeButton.addEventListener("click", (e) => {
-  e.stopPropagation();
-  makeRecipePage.classList.add("show");
-});
+if (prepareRecipeButton) {
+  prepareRecipeButton.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (selectedRecipe) {
+      openMakeRecipePage(selectedRecipe);
+    } else {
+      showToast("Please choose a recipe first.");
+    }
+  });
+}
 
 function closeMenu() {
   menuPage.classList.remove("show");
@@ -1633,6 +3031,7 @@ function closeMenu() {
 if (toGetListBtn) {
   toGetListBtn.addEventListener("click", () => {
     toGetListPage.classList.add("show");
+    toGetListPage.style.transform = "tranlateX(0)";
 
     closeMenu();
   });
@@ -1823,7 +3222,6 @@ overlay.addEventListener("click", () => {
 if (fabCamera) {
   fabCamera.addEventListener("click", (e) => {
     e.stopPropagation();
-    console.log("Camera clicked");
   });
 }
 
@@ -1831,6 +3229,83 @@ function openRecipePage() {
   recipePage.classList.add("show");
   closeFab();
   closeMenu();
+  searchRecipes(recipeSearchInput?.value?.trim() || "chicken");
+}
+
+if (recipeSearchInput) {
+  recipeSearchInput.addEventListener(
+    "input",
+    debounce((event) => {
+      searchRecipes(event.target.value.trim());
+    }, 350),
+  );
+}
+
+// Recipe Tab Navigation
+const recipeTabs = document.querySelectorAll(".recipe-select");
+let currentTab = "recommended";
+
+recipeTabs.forEach((tab) => {
+  tab.addEventListener("click", () => {
+    recipeTabs.forEach((t) => t.classList.remove("active"));
+    tab.classList.add("active");
+    currentTab = tab.dataset.tab;
+
+    if (currentTab === "recommended") {
+      searchRecipes(recipeSearchInput?.value?.trim() || "chicken");
+    } else if (currentTab === "explore") {
+      searchRecipes(recipeSearchInput?.value?.trim() || "pasta");
+    } else if (currentTab === "saved") {
+      renderSavedRecipes();
+    }
+  });
+});
+
+function renderSavedRecipes() {
+  const favorites = getFavorites();
+  if (!recipeList) return;
+
+  if (favorites.recipes.length === 0) {
+    recipeList.innerHTML =
+      '<div style="padding: 40px 20px; text-align: center; color: #999;">No saved recipes yet. Add from recommended recipes.</div>';
+    return;
+  }
+
+  renderRecipeCards(favorites.recipes);
+}
+
+if (recipeList) {
+  recipeList.addEventListener("click", (event) => {
+    const likeBtn = event.target.closest(".like-item");
+    if (likeBtn) {
+      event.stopPropagation();
+      const name = likeBtn.dataset.name || "";
+      const origin = likeBtn.dataset.origin || "";
+
+      if (isFavorite("recipe", name, origin)) {
+        removeFavorite("recipe", name, origin);
+        likeBtn.classList.remove("liked");
+        showToast("✗ Removed from favorites");
+      } else {
+        addFavorite("recipe", name, origin);
+        likeBtn.classList.add("liked");
+        showToast("✓ Added to favorites");
+      }
+    }
+  });
+}
+
+if (backFromRecipe) {
+  backFromRecipe.addEventListener("click", () => {
+    recipePage.classList.remove("show");
+  });
+}
+
+const makeRecipeBackBtn = makeRecipePage?.querySelector(".back-btn");
+if (makeRecipeBackBtn) {
+  makeRecipeBackBtn.addEventListener("click", () => {
+    makeRecipePage.classList.remove("show");
+  });
 }
 
 if (recipeBtn) {
@@ -2046,29 +3521,62 @@ function suggestCategory(itemName) {
 function openAddItemModal() {
   addItemModal.classList.add("show");
   closeFab();
-  // if (addItemModal) {homePage.style.transform = "scale(0.9)"}
-  // else {homePage.style.transform = "scale(1)"}
   homePage.style.transform = "scale(0.98)";
 }
 
-// Close modal
+function clearConcurrentItems() {
+  concurrentItemsList = [];
+  renderConcurrentItems();
+}
+
+function confirmCancelAddItem() {
+  const confirmMessage =
+    "Canceling will clear all concurrent items and reset the add item form. Continue?";
+
+  // Use centered custom confirm modal if available
+  const overlay = document.getElementById("centerConfirmOverlay");
+  const msg = document.getElementById("centerConfirmMessage");
+  const okBtn = document.getElementById("centerConfirmOk");
+  const cancelBtn = document.getElementById("centerConfirmCancel");
+
+  if (overlay && msg && okBtn && cancelBtn) {
+    msg.textContent = confirmMessage;
+    overlay.classList.add("show");
+
+    const cleanup = () => {
+      overlay.classList.remove("show");
+      okBtn.onclick = null;
+      cancelBtn.onclick = null;
+    };
+
+    okBtn.onclick = () => {
+      clearConcurrentForm();
+      clearConcurrentItems();
+      closeModal();
+      cleanup();
+    };
+
+    cancelBtn.onclick = () => {
+      cleanup();
+    };
+    return;
+  }
+
+  // Fallback to native confirm
+  if (window.confirm(confirmMessage)) {
+    clearConcurrentForm();
+    clearConcurrentItems();
+    closeModal();
+  }
+}
+
+// Close modal without clearing the form or queued concurrent items
 function closeModal() {
   addItemModal.classList.remove("show");
-  // Clear inputs
-  const itemNameInput = document.getElementById("itemNameInput");
-  const quantityInput = document.getElementById("quantityInput");
-  const priceInput = document.getElementById("priceInput");
-  const categorySelect = document.getElementById("categorySelect");
-
-  if (itemNameInput) itemNameInput.value = "";
-  if (quantityInput) quantityInput.value = "1";
-  if (priceInput) priceInput.value = "";
-  if (categorySelect) categorySelect.value = "Food";
-
   homePage.style.transform = "scale(1)";
 }
 
-if (cancelBtn) cancelBtn.addEventListener("click", closeModal);
+if (cancelBtn) cancelBtn.addEventListener("click", confirmCancelAddItem);
 if (addItemBtn) addItemBtn.addEventListener("click", openAddItemModal);
 
 addItemModal?.addEventListener("click", (e) => {
@@ -2099,90 +3607,120 @@ if (increaseQty) {
 const concurrentContainer = document.querySelector(
   ".concurrent-items-container",
 );
-const concurrentItems = document.querySelectorAll(".concurrent-items-wrapper");
+const concurrentAddBtn = document.getElementById("concurrentAddBtn");
 
-concurrentContainer.addEventListener("click", (e) => {
-  e.stopPropagation();
-  concurrentContainer.classList.toggle("expand");
+if (concurrentAddBtn) {
+  concurrentAddBtn.addEventListener("click", () => {
+    addToConcurrentList();
+    if (concurrentContainer && !concurrentContainer.classList.contains("expand")) {
+      concurrentContainer.classList.add("expand");
+    }
+  });
+}
 
-  if (!concurrentContainer.classList.contains("expand")) {
-    concurrentItems.forEach((item) => {
-      item.classList.remove("expand");
-    });
+function getConcurrentItems() {
+  return document.querySelectorAll(".concurrent-items-wrapper");
+}
+
+function populateFormFromItem(item) {
+  const itemNameInput = document.getElementById("itemNameInput");
+  const quantityInput = document.getElementById("quantityInput");
+  const priceInput = document.getElementById("priceInput");
+  const storeInput = document.getElementById("storeInput");
+
+  if (itemNameInput) itemNameInput.value = item.name || "";
+  if (quantityInput) quantityInput.value = item.quantity || "1";
+  if (priceInput) priceInput.value = item.price || "";
+  if (storeInput) storeInput.value = item.store || "";
+}
+
+function isAddItemFormPartiallyFilled() {
+  const itemNameInput = document.getElementById("itemNameInput");
+  const quantityInput = document.getElementById("quantityInput");
+  const priceInput = document.getElementById("priceInput");
+  const storeInput = document.getElementById("storeInput");
+
+  const itemName = itemNameInput?.value.trim() || "";
+  const price = priceInput?.value.trim() || "";
+  const quantity = quantityInput?.value.trim() || "";
+  const store = storeInput?.value.trim() || "";
+
+  return Boolean(itemName || price || quantity || store);
+}
+
+function removeConcurrentItem(index) {
+  concurrentItemsList.splice(index, 1);
+  renderConcurrentItems();
+}
+
+function editConcurrentItem(index) {
+  const item = concurrentItemsList[index];
+  if (!item) return;
+  concurrentItemsList.splice(index, 1);
+  renderConcurrentItems();
+  populateFormFromItem(item);
+  if (concurrentContainer && !concurrentContainer.classList.contains("expand")) {
+    concurrentContainer.classList.add("expand");
   }
-});
-concurrentItems.forEach((item) => {
-  item.addEventListener("click", (e) => {
-    e.stopPropagation();
+  showToast(`Editing queued item: ${item.name}`);
+}
 
-    if (!concurrentContainer.classList.contains("expand")) {
+// Safe-guard: only attach listeners if container exists
+if (concurrentContainer) {
+  concurrentContainer.addEventListener("click", (e) => {
+    const wrapper = e.target.closest(".concurrent-items-wrapper");
+    const removeBtn = e.target.closest(".remove-concurrent");
+    const editBtn = e.target.closest(".edit-concurrent");
+
+    if (removeBtn) {
+      e.stopPropagation();
+      const idx = parseInt(removeBtn.dataset.index, 10);
+      removeConcurrentItem(idx);
       return;
     }
-    const isExpanded = item.classList.contains("expand");
 
-    concurrentItems.forEach((otherItem) => {
+    if (editBtn) {
+      e.stopPropagation();
+      const idx = parseInt(editBtn.dataset.index, 10);
+      editConcurrentItem(idx);
+      return;
+    }
+
+    if (!wrapper && e.target === concurrentContainer) {
+      e.stopPropagation();
+      concurrentContainer.classList.toggle("expand");
+
+      if (!concurrentContainer.classList.contains("expand")) {
+        getConcurrentItems().forEach((item) => {
+          item.classList.remove("expand");
+        });
+      }
+      return;
+    }
+
+    if (!wrapper) return;
+    if (!concurrentContainer.classList.contains("expand")) return;
+
+    const isExpanded = wrapper.classList.contains("expand");
+    getConcurrentItems().forEach((otherItem) => {
       otherItem.classList.remove("expand");
       otherItem.style.transformOrigin = "";
     });
 
     if (!isExpanded) {
-      item.classList.add("expand");
+      wrapper.classList.add("expand");
 
-      // Get item position in container to set transform-origin
-      const itemRect = item.getBoundingClientRect();
+      const itemRect = wrapper.getBoundingClientRect();
       const containerRect = concurrentContainer.getBoundingClientRect();
       const relativeTop = itemRect.top - containerRect.top;
       const relativeLeft = itemRect.left - containerRect.left;
       const containerWidth = containerRect.width;
       const containerHeight = containerRect.height;
 
-      // Determine vertical anchor point
-      /* let verticalOrigin = "center";
-      let horizontalOrigin = "centeright";
-      if (relativeTop < containerHeight * 0.33 && relativeLeft < containerWidth * 0.33) {
-        verticalOrigin = "top";
-        horizontalOrigin = "left";
-        item.style.backgroundColor = "red";
-      } else if (relativeTop < containerHeight * 0.33 && relativeLeft > containerWidth * 0.66) {
-        verticalOrigin = "top";
-        horizontalOrigin = "right";
-        item.style.marginRight = "36px";
-        item.style.backgroundColor = "yellow";
-      } else if (relativeTop > containerHeight * 0.66 && relativeLeft > containerWidth * 0.66) {
-        verticalOrigin = "bottom";
-        horizontalOrigin = "right";
-        item.style.marginRight = "36px";
-        item.style.backgroundColor = "violet";
-      } else if (relativeTop > containerHeight * 0.66 && relativeLeft < containerWidth * 0.66) {
-        verticalOrigin = "bottom";
-        horizontalOrigin = "left";
-        item.style.backgroundColor = "blue";
-      } else if (relativeTop > containerHeight * 0.66 && relativeLeft < containerWidth * 0.33) {
-        verticalOrigin = "bottom";
-        horizontalOrigin = "left";
-        item.style.backgroundColor = "brown";
-      } else if (relativeTop < containerHeight * 0.66 && relativeLeft < containerWidth * 0.33) {
-        verticalOrigin = "bottom";
-        horizontalOrigin = "left";
-        item.style.backgroundColor = "green";
-      } else if (relativeTop < containerHeight * 0.66 && relativeLeft > containerWidth * 0.33) {
-        verticalOrigin = "bottom";
-        horizontalOrigin = "right";
-        item.style.backgroundColor = "rgba(115, 230, 115)";
-      } else if (relativeTop > containerHeight * 0.66 && relativeLeft > containerWidth * 0.33) {
-        verticalOrigin = "bottom";
-        horizontalOrigin = "right";
-        item.style.backgroundColor = "rgba(115, 20, 115)";
-      }
-
-      item.style.transformOrigin = `${horizontalOrigin} ${verticalOrigin}`; */
-
       let position = "";
 
       switch (true) {
-        // TOP ROW (relatieTop < 3)
-        case relativeTop < containerHeight * 0.33 &&
-          relativeLeft < containerWidth * 0.66:
+        case relativeTop < containerHeight * 0.33 && relativeLeft < containerWidth * 0.66:
           position = "isTopLeft";
           break;
         case relativeTop < containerHeight * 0.33 &&
@@ -2194,12 +3732,11 @@ concurrentItems.forEach((item) => {
           relativeLeft > containerWidth * 0.66:
           position = "isTopRight";
           break;
-
-        // MIDDLE ROW  (relativeTop between 3 and 6)
-        case relativeTop < containerHeight * 0.66 &&
+        case relativeTop > containerHeight * 0.33 &&
           relativeTop < containerHeight * 0.66 &&
           relativeLeft < containerWidth * 0.33:
           position = "isMiddleLeft";
+          break;
         case relativeTop > containerHeight * 0.33 &&
           relativeTop < containerHeight * 0.66 &&
           relativeLeft > containerWidth * 0.33 &&
@@ -2211,8 +3748,6 @@ concurrentItems.forEach((item) => {
           relativeLeft > containerWidth * 0.66:
           position = "isMiddleRight";
           break;
-
-        // BOTTOM ROW (relativeTio > 6)
         case relativeTop > containerHeight * 0.66 &&
           relativeLeft < containerWidth * 0.33:
           position = "isBottomLeft";
@@ -2226,60 +3761,43 @@ concurrentItems.forEach((item) => {
           relativeLeft > containerWidth * 0.66:
           position = "isBottomRight";
           break;
-
         default:
           position = "unknown";
       }
 
       if (position === "isTopLeft") {
-        // item.style.backgroundColor = "red";
-        item.style.transformOrigin = "left top";
-      }
-      if (position === "isTopCenter") {
-        // item.style.backgroundColor = "yellow";
+        wrapper.style.transformOrigin = "left top";
       }
       if (position === "isTopRight") {
-        // item.style.backgroundColor = "green";
-        item.style.transformOrigin = "right top";
-      }
-      if (position === "isMiddleLeft") {
-        // item.style.backgroundColor = " blue";
+        wrapper.style.transformOrigin = "right top";
       }
       if (position === "isMiddleCenter") {
-        // item.style.backgroundColor = "orange";
-        item.style.transformOrigin = "left center";
+        wrapper.style.transformOrigin = "left center";
       }
       if (position === "isMiddleRight") {
-        // item.style.backgroundColor = "greenyellow";
-        item.style.transformOrigin = "right center";
+        wrapper.style.transformOrigin = "right center";
       }
       if (position === "isBottomLeft") {
-        // item.style.backgroundColor = "indigo";
-        item.style.transformOrigin = "left bottom";
+        wrapper.style.transformOrigin = "left bottom";
       }
       if (position === "isBottomCenter") {
-        // item.style.backgroundColor = "gray";
-        item.style.transformOrigin = "center bottom";
+        wrapper.style.transformOrigin = "center bottom";
       }
       if (position === "isBottomRight") {
-        // item.style.backgroundColor = "gold";
-        item.style.transformOrigin = "right bottom";
+        wrapper.style.transformOrigin = "right bottom";
       }
-
-      /* if (relativeLeft < containerWidth * 0.33) {
-        horizontalOrigin = "left";
-      } else if (relativeLeft > containerWidth * 0.66) {
-        horizontalOrigin = "right";
-      }
-      item.style.transformOrigin = `right ${verticalOrigin}`; */
     }
   });
-});
+}
+
 document.addEventListener("click", () => {
-  concurrentContainer.classList.remove("expand");
-  concurrentItems.forEach((item) => {
-    item.classList.remove("expand");
-  });
+  if (concurrentContainer) concurrentContainer.classList.remove("expand");
+  const concurrentItemsListNodes = getConcurrentItems();
+  if (concurrentItemsListNodes.length) {
+    concurrentItemsListNodes.forEach((item) => {
+      item.classList.remove("expand");
+    });
+  }
 });
 
 function getCategoryNameFromHeader(header) {
@@ -2886,7 +4404,7 @@ function updateFilterSortVisibility(hasVisibleCategories = true) {
 
 // Auto-sort when new items are added
 // ===== SAVE ITEM - FIXED FOR YOUR STRUCTURE =====
-if (saveItemBtn) {
+/* if (saveItemBtn) {
   saveItemBtn.addEventListener("click", () => {
     saveItemBtn.disabled = true;
     try {
@@ -2951,14 +4469,14 @@ if (saveItemBtn) {
 
       const existingItemSection = categoryCard
         ? Array.from(categoryCard.querySelectorAll(".item-card-sec")).find(
-            (section) => {
-              const itemTitle = section.querySelector(".item-name");
-              return (
-                itemTitle &&
-                itemTitle.textContent.trim().toLowerCase() === normalizedName
-              );
-            },
-          )
+          (section) => {
+            const itemTitle = section.querySelector(".item-name");
+            return (
+              itemTitle &&
+              itemTitle.textContent.trim().toLowerCase() === normalizedName
+            );
+          },
+        )
         : null;
 
       let updatedQuantity = quantity;
@@ -3030,6 +4548,7 @@ if (saveItemBtn) {
       updateFilterBar();
       filterCategories(activeFilter);
       renderInsightsChart();
+      updateInsightsPage();
 
       setTimeout(() => {
         initializeSwipe();
@@ -3039,6 +4558,344 @@ if (saveItemBtn) {
 
       closeModal();
       showToast("Item added successfully!");
+    } catch (error) {
+      console.error("Error saving item:", error);
+      showToast("Error saving item. Please try again.");
+      recordAdminMetric("errors", 1);
+      recordAdminEvent(`Save item error: ${error.message}`);
+    } finally {
+      saveItemBtn.disabled = false;
+    }
+  });
+} */
+
+// ====================== CONCURRENT ITEMS & STORE-BASED SAVING ======================
+let concurrentItemsList = [];
+
+function getFormItemData() {
+  const itemNameInput = document.getElementById("itemNameInput");
+  const quantityInput = document.getElementById("quantityInput");
+  const priceInput = document.getElementById("priceInput");
+  const storeInput = document.getElementById("storeInput");
+
+  return {
+    name: itemNameInput?.value.trim(),
+    quantity: Math.max(1, parseInt(quantityInput?.value, 10) || 1),
+    price: parseFloat(priceInput?.value) || 0,
+    store: storeInput?.value.trim() || "Unknown Store",
+  };
+}
+
+function addToConcurrentList() {
+  const item = getFormItemData();
+
+  if (!item.name) {
+    showToast("Please enter item name");
+    return;
+  }
+
+  if (item.price <= 0) {
+    showToast("Please enter valid price");
+    return;
+  }
+
+  concurrentItemsList.push({
+    ...item,
+    category: suggestSmartCategory(item.name),
+    createdAt: new Date().toISOString(),
+  });
+
+  renderConcurrentItems();
+  clearConcurrentForm();
+  showToast(`+ ${item.name} added to concurrent items`);
+}
+
+function renderConcurrentItems() {
+  const container = document.querySelector(".concurrent-items-container");
+  if (!container) return;
+
+  container.innerHTML = "";
+
+  if (concurrentItemsList.length === 0) {
+    container.innerHTML = `<div class="concurrent-empty">No concurrent items yet</div>`;
+  } else {
+    concurrentItemsList.forEach((item, index) => {
+      const div = document.createElement("div");
+      div.className = "concurrent-items-wrapper";
+      div.dataset.index = index;
+      div.innerHTML = `
+        <div class="concurrent-default-display">${item.name}</div>
+        <div class="concurrent-items-details">
+          <div class="concurrent-detail-row">
+            <div class="concurrent-item-detail">Qty: ${item.quantity}</div>
+            <div class="concurrent-item-detail">Price: $${item.price.toFixed(2)}</div>
+          </div>
+          <div class="concurrent-detail-row">
+            <div class="concurrent-item-detail">Store: ${item.store}</div>
+            <div class="concurrent-item-detail">Category: ${item.category}</div>
+          </div>
+          <div class="concurrent-actions-row">
+            <button class="edit-concurrent" data-index="${index}" type="button">Edit</button>
+            <button class="remove-concurrent" data-index="${index}" type="button">Delete</button>
+          </div>
+        </div>
+      `;
+      container.appendChild(div);
+    });
+  }
+
+  updateConcurrentAddButtonLabel();
+}
+
+function updateConcurrentAddButtonLabel() {
+  if (!concurrentAddBtn) return;
+  if (concurrentItemsList.length > 0) {
+    concurrentAddBtn.innerHTML = `Add more (${concurrentItemsList.length}) <p>+</p>`;
+  } else {
+    concurrentAddBtn.innerHTML = `Add more <p>+</p>`;
+  }
+}
+
+function clearConcurrentForm() {
+  const itemNameInput = document.getElementById("itemNameInput");
+  const quantityInput = document.getElementById("quantityInput");
+  const priceInput = document.getElementById("priceInput");
+  const storeInput = document.getElementById("storeInput");
+
+  if (itemNameInput) itemNameInput.value = "";
+  if (quantityInput) quantityInput.value = "1";
+  if (priceInput) priceInput.value = "";
+  if (storeInput) storeInput.value = "";
+}
+
+function addInventoryItem(item, { silent = false } = {}) {
+  if (!item || !item.name) return false;
+
+  const itemName = item.name.trim();
+  const quantity = Math.max(1, parseInt(item.quantity, 10) || 1);
+  const price = parseFloat(item.price) || 0;
+  const category = item.category || suggestSmartCategory(itemName);
+
+  if (!itemName || price <= 0) return false;
+
+  const normalizedName = itemName.toLowerCase();
+  const normalizedCategory = category.toLowerCase();
+  const cardContainer = document.querySelector(".card-container");
+  const categoryCards = cardContainer
+    ? cardContainer.querySelectorAll(".category-card")
+    : [];
+  let categoryCard = null;
+
+  categoryCards.forEach((card) => {
+    const cardHeader = card.querySelector(".card-header");
+    const categoryName = getCategoryNameFromHeader(cardHeader);
+    if (categoryName.toLowerCase() === normalizedCategory) {
+      categoryCard = card;
+    }
+  });
+
+  const existingDataItem = items.find(
+    (existing) =>
+      existing.name.toLowerCase() === normalizedName &&
+      existing.category.toLowerCase() === normalizedCategory,
+  );
+
+  const existingItemSection = categoryCard
+    ? Array.from(categoryCard.querySelectorAll(".item-card-sec")).find(
+      (section) => {
+        const itemTitle = section.querySelector(".item-name");
+        return (
+          itemTitle &&
+          itemTitle.textContent.trim().toLowerCase() === normalizedName
+        );
+      },
+    )
+    : null;
+
+  let updatedQuantity = quantity;
+  let updatedPrice = price;
+
+  if (existingDataItem) {
+    updatedQuantity = existingDataItem.quantity + quantity;
+    updatedPrice = existingDataItem.price + price;
+    existingDataItem.quantity = updatedQuantity;
+    existingDataItem.price = updatedPrice;
+    existingDataItem.updatedAt = new Date().toISOString();
+  }
+
+  if (existingItemSection) {
+    const itemCard = existingItemSection.querySelector(".item-card");
+    const qtyEl = itemCard?.querySelector(".item-qty");
+    const priceEl = itemCard?.querySelector(".item-price");
+
+    if (qtyEl) qtyEl.textContent = formatQuantity(updatedQuantity);
+    if (priceEl) priceEl.textContent = `$${updatedPrice.toFixed(2)}`;
+
+    existingItemSection.dataset.infoStates = JSON.stringify(
+      getItemInfoStates(itemName, category),
+    );
+    updateCardInfoState(existingItemSection, 0);
+  }
+
+  if (!existingItemSection) {
+    if (categoryCard) {
+      categoryCard.appendChild(
+        createItemCardSection(itemName, updatedQuantity, updatedPrice),
+      );
+    } else if (cardContainer) {
+      const newCategoryCard = document.createElement("div");
+      newCategoryCard.className = "category-card";
+      newCategoryCard.appendChild(
+        createNewCategoryCardSection(
+          category,
+          itemName,
+          updatedQuantity,
+          updatedPrice,
+        ),
+      );
+      cardContainer.appendChild(newCategoryCard);
+    }
+  }
+
+  if (!existingDataItem) {
+    items.push({
+      id: Date.now(),
+      name: itemName,
+      category,
+      quantity: updatedQuantity,
+      price: updatedPrice,
+      timestamp: new Date().toISOString(),
+      createdAt: new Date(),
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  localStorage.setItem("planup_items", JSON.stringify(items));
+
+  if (!silent) {
+    recordAdminMetric("itemsAdded", 1);
+    recordAdminEvent(`Item added: ${itemName} (${category})`);
+  }
+
+  return true;
+}
+
+// Smart Category Suggestion (Improved)
+function suggestSmartCategory(itemName) {
+  const name = itemName.toLowerCase().trim();
+
+  const rules = {
+    Vegetables: [
+      "lettuce",
+      "carrot",
+      "broccoli",
+      "spinach",
+      "cabbage",
+      "tomato",
+      "onion",
+      "pepper",
+      "cucumber",
+    ],
+    Fruits: [
+      "apple",
+      "banana",
+      "orange",
+      "mango",
+      "strawberry",
+      "grape",
+      "pineapple",
+    ],
+    Meat: ["chicken", "beef", "pork", "fish", "salmon", "steak", "turkey"],
+    Dairy: ["milk", "cheese", "yogurt", "butter", "cream"],
+    Grains: ["rice", "bread", "pasta", "oats", "cereal"],
+    Snacks: ["chips", "cookies", "chocolate", "nuts", "candy"],
+    Beverages: ["water", "juice", "soda", "coffee", "tea"],
+    Spices: ["salt", "pepper", "spice", "sauce", "oil"],
+  };
+
+  for (const [category, keywords] of Object.entries(rules)) {
+    if (keywords.some((kw) => name.includes(kw))) return category;
+  }
+  return "Other";
+}
+
+// ====================== SAVE ALL CONCURRENT ITEMS ======================
+if (saveItemBtn) {
+  saveItemBtn.addEventListener("click", () => {
+    saveItemBtn.disabled = true;
+    try {
+      const currentItem = getFormItemData();
+      const hasCurrentFormData = isAddItemFormPartiallyFilled();
+      const hasCurrentValidItem = currentItem.name && currentItem.price > 0;
+
+      if (concurrentItemsList.length > 0) {
+        if (hasCurrentFormData) {
+          if (!hasCurrentValidItem) {
+            showToast("Please complete the form before saving concurrent items.");
+            return;
+          }
+          addToConcurrentList();
+        }
+
+        // Save queued concurrent items, count successes
+        let savedCount = 0;
+        concurrentItemsList.forEach((item) => {
+          try {
+            if (addInventoryItem(item, { silent: true })) savedCount++;
+          } catch (e) {
+            console.warn("Failed to save concurrent item", item, e);
+          }
+        });
+
+        if (savedCount > 0) {
+          recordAdminMetric("itemsAdded", savedCount);
+          recordAdminEvent(`Saved ${savedCount} concurrent item(s)`);
+          showToast(`${savedCount} item(s) saved successfully!`);
+        } else {
+          showToast("No concurrent items were saved.");
+        }
+
+        concurrentItemsList = [];
+        renderConcurrentItems();
+      } else {
+        if (!hasCurrentValidItem) {
+          showToast("Please enter item name and valid price.");
+          return;
+        }
+
+        const added = addInventoryItem(currentItem);
+        if (added) {
+          recordAdminMetric("itemsAdded", 1);
+          recordAdminEvent(`Item added: ${currentItem.name}`);
+          showToast("Item added successfully!");
+        } else {
+          showToast("Could not save item. Please check the inputs.");
+          return;
+        }
+      }
+
+      // Safely invoke update/refresh functions so errors don't abort the save flow
+      try {
+        if (typeof updateFilterSortVisibility === "function") updateFilterSortVisibility();
+      } catch (e) {
+        console.warn("updateFilterSortVisibility failed", e);
+      }
+      try { updateBudgetProgress(); } catch (e) { console.warn("updateBudgetProgress failed", e); }
+      try { updateCategoryEmptyState(); } catch (e) { console.warn("updateCategoryEmptyState failed", e); }
+      try { updateGlobalEmptyState(); } catch (e) { console.warn("updateGlobalEmptyState failed", e); }
+      try { updateFilterBar(); } catch (e) { console.warn("updateFilterBar failed", e); }
+      try { filterCategories(activeFilter); } catch (e) { console.warn("filterCategories failed", e); }
+      try { renderInsightsChart(); } catch (e) { console.warn("renderInsightsChart failed", e); }
+      try { updateInsightsPage(); } catch (e) { console.warn("updateInsightsPage failed", e); }
+
+      setTimeout(() => {
+        initializeSwipe();
+        initializeCardExpansion();
+        initializeImageModals();
+      }, 100);
+
+      clearConcurrentForm();
+      closeModal();
     } catch (error) {
       console.error("Error saving item:", error);
       showToast("Error saving item. Please try again.");
@@ -3099,80 +4956,103 @@ if (autoCategorizeBtn && itemNameInput) {
 
 // ===== UPDATE CATEGORY TOTALS =====
 
+// ====================== BUDGET CARD - LIVE & CORRECT ======================
 function updateBudgetProgress() {
   if (!budgetCard || !progressFill) return;
 
-  const allPrices = document.querySelectorAll(".item-price");
-  let totalEstimated = 0;
+  const filteredItems = getFilteredItems(); // Use the same filter as Insights
+
+  let totalSpent = 0;
   let totalItems = 0;
 
-  allPrices.forEach((el) => {
-    const price = parseFloat(el.textContent.replace("$", "").trim());
-    if (!isNaN(price)) {
-      totalEstimated += price;
-      totalItems++;
-    }
+  filteredItems.forEach((item) => {
+    const price = parseFloat(item.price) || 0;
+    const qty = parseInt(item.quantity) || 1;
+    totalSpent += price * qty;
+    totalItems += qty;
   });
 
-  const budgetAmount = budget;
-  const remaining = budgetAmount - totalEstimated;
-  const percentage = (totalEstimated / budgetAmount) * 100;
-  const avgPerItem = totalItems > 0 ? totalEstimated / totalItems : 0;
-  const remainingLabel = document.getElementById("remainingLabel");
+  /* infoBlock.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      infoBlock.click();
+    }
+  }); */
 
-  const trendIcon = document.querySelector(".trend-icon");
+  let setBudget = [];
 
-  if (estimatesValue)
-    estimatesValue.textContent = `$${totalEstimated.toFixed(2)}`;
+  function setBudgetValue() {
+    const budgetInput = document.getElementById("budgetInput");
+    budgetInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        budgetInput = budgetInput.value;
+      }
+    });
+    setBudget.push(budgetInput);
+    return budgetInput;
+  }
+
+  const budgetAmount = parseFloat(budget) || 0;
+  const remaining = budgetAmount - totalSpent;
+  const percentage = budgetAmount > 0 ? (totalSpent / budgetAmount) * 100 : 0;
+  const avgPerItem = totalItems > 0 ? totalSpent / totalItems : 0;
+
+  // Update DOM
+  if (estimatesValue) estimatesValue.textContent = `$${totalSpent.toFixed(2)}`;
   if (remainingValue)
-    remainingValue.textContent = `$${Math.abs(remaining).toFixed(2)}`;
+    remainingValue.textContent = `$${Math.max(0, remaining).toFixed(2)}`;
   if (avgSpending) avgSpending.textContent = `$${avgPerItem.toFixed(2)}`;
   if (itemCount) itemCount.textContent = `•${totalItems} items`;
+
   if (progressPercentage)
     progressPercentage.textContent = `${Math.round(percentage)}%`;
 
-  // Animate progress bar
-  progressFill.style.width = "0%";
-  setTimeout(() => {
-    progressFill.style.width = `${Math.min(percentage, 100)}%`;
-  }, 50);
+  // Progress bar animation
+  progressFill.style.transition = "width 0.4s ease";
+  progressFill.style.width = `${Math.min(percentage, 100)}%`;
 
-  // Update states
+  // Status & styling
   budgetCard.className = "budget-card";
-  if (trendIcon) trendIcon.className = "trend-icon";
+  const trendIcon = document.querySelector(".trend-icon");
+  const progressStatusEl = document.getElementById("progressStatus");
+  const remainingLabel = document.getElementById("remainingLabel");
 
   if (percentage < 70) {
     budgetCard.classList.add("normal");
     if (trendIcon) trendIcon.classList.add("normal");
-    if (progressStatus) progressStatus.textContent = "On Track";
-    budgetExceededNotified = false; // Reset notification flag
-  } else if (percentage >= 70 && percentage < 100) {
+    if (progressStatusEl) progressStatusEl.textContent = "On Track";
+    // reset notified flag when safely below thresholds
+    window.__budgetAlertNotified = false;
+  } else if (percentage < 100) {
     budgetCard.classList.add("warning");
     if (trendIcon) trendIcon.classList.add("warning");
-    if (progressStatus) progressStatus.textContent = "Watch Spending";
-    budgetExceededNotified = false; // Reset notification flag
-  } else if (percentage === 100) {
-    budgetCard.classList.add("warning");
-    if (trendIcon) trendIcon.classList.add("warning");
-    if (progressStatus) progressStatus.textContent = "Budget Reached";
-    budgetExceededNotified = false;
+    if (progressStatusEl) progressStatusEl.textContent = "Watch Spending";
+    // If percentage crosses configured alert threshold, show notification once
+    if (
+      budgetAlertsEnabled &&
+      percentage >= alertAtBudget &&
+      !window.__budgetAlertNotified
+    ) {
+      showBudgetNotification(`You've used ${Math.round(percentage)}% of your budget`);
+      window.__budgetAlertNotified = true;
+    }
   } else {
     budgetCard.classList.add("over");
     if (trendIcon) trendIcon.classList.add("over");
-    if (progressStatus) progressStatus.textContent = "Over Budget!";
-    remainingLabel.textContent = "Over budget";
+    if (progressStatusEl) progressStatusEl.textContent = "Over Budget!";
+    if (remainingLabel) remainingLabel.textContent = "Over budget";
 
-    // Trigger notification when budget is exceeded (only once)
-    if (!budgetExceededNotified) {
-      showBudgetNotification();
-      budgetExceededNotified = true;
+    if (budgetAlertsEnabled && !window.__budgetAlertNotified) {
+      showBudgetNotification(`You've used ${Math.round(percentage)}% of your budget`);
+      window.__budgetAlertNotified = true;
     }
   }
 }
 
-function showBudgetNotification() {
+function showBudgetNotification(customMessage) {
+  const message = customMessage || "Budget exceeded!";
   showNotification({
-    message: "Budget exceeded!",
+    message,
     type: "warning",
     icon: "budget",
     sound: "iphone",
@@ -3630,7 +5510,13 @@ const settingsOptions = {
   "budget-setting": () => {
     const newBudget = prompt("Enter new monthly budget:", budget);
     if (newBudget && !isNaN(newBudget)) {
-      budget = parseFloat(newBudget);
+      let nb = parseFloat(newBudget);
+      if (nb < 50) {
+        showToast("Minimum budget is $50");
+        nb = 50;
+      }
+      budget = nb;
+      localStorage.setItem(BUDGET_KEY, String(budget));
       updateBudgetProgress();
       showToast(`Budget updated to $${budget}`);
     }
@@ -3755,6 +5641,76 @@ window.addEventListener("DOMContentLoaded", () => {
   if (typeof renderToGetItems === "function") {
     renderToGetItems();
   }
+
+  // Initialize budget inputs, alert percent and toggler
+  const budgetInputEl = document.getElementById("budgetInput");
+  const alertInputEl = document.getElementById("alertAtBudgetInput");
+  const budgetTogglerEl = document.getElementById("budgetAlertsToggler");
+
+  function setBudgetFromInput() {
+    if (!budgetInputEl) return;
+    let v = parseFloat(budgetInputEl.value);
+    if (isNaN(v) || v < 50) {
+      showToast("Minimum budget is $50");
+      v = 50;
+      budgetInputEl.value = v;
+    }
+    budget = v;
+    localStorage.setItem(BUDGET_KEY, String(budget));
+    updateBudgetProgress();
+    showToast(`Budget set to $${budget}`);
+  }
+
+  function setAlertPercentFromInput() {
+    if (!alertInputEl) return;
+    let p = parseInt(alertInputEl.value, 10);
+    if (isNaN(p) || p < 1 || p > 100) {
+      showToast("Alert percent must be 1-100");
+      alertInputEl.value = alertAtBudget;
+      return;
+    }
+    alertAtBudget = p;
+    localStorage.setItem(ALERT_KEY, String(alertAtBudget));
+    updateBudgetProgress();
+    showToast(`Alert set at ${alertAtBudget}%`);
+  }
+
+  if (budgetInputEl) {
+    budgetInputEl.value = budget;
+    budgetInputEl.addEventListener("change", setBudgetFromInput);
+    budgetInputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") setBudgetFromInput();
+    });
+  }
+
+  if (alertInputEl) {
+    alertInputEl.value = alertAtBudget;
+    alertInputEl.addEventListener("change", setAlertPercentFromInput);
+    alertInputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") setAlertPercentFromInput();
+    });
+  }
+
+  if (budgetTogglerEl) {
+    const tg = budgetTogglerEl.querySelector(".toggle");
+    const ground = budgetTogglerEl.querySelector(".toggle-ground");
+    if (budgetAlertsEnabled) {
+      tg?.classList.add("on");
+      ground?.classList.add("on");
+    } else {
+      tg?.classList.remove("on");
+      ground?.classList.remove("on");
+    }
+    budgetTogglerEl.querySelector(".click-listener")?.addEventListener("click", () => {
+      budgetAlertsEnabled = !budgetAlertsEnabled;
+      localStorage.setItem(BUDGET_ALERTS_ENABLED_KEY, budgetAlertsEnabled ? "true" : "false");
+      showToast(`Budget alerts ${budgetAlertsEnabled ? "enabled" : "disabled"}`);
+    });
+  }
+
+  // Ensure bell not animating on load
+  if (notificationBtn) notificationBtn.classList.remove("shake");
+
 });
 
 // ===== PROFILE PAGE SCROLL EFFECT =====
