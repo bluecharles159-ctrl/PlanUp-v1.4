@@ -56,7 +56,8 @@ let alertAtBudget = parseInt(localStorage.getItem(ALERT_KEY), 10);
 if (isNaN(alertAtBudget) || alertAtBudget < 1 || alertAtBudget > 100) {
   alertAtBudget = 80;
 }
-let budgetAlertsEnabled = localStorage.getItem(BUDGET_ALERTS_ENABLED_KEY) !== "false"; // default true
+let budgetAlertsEnabled =
+  localStorage.getItem(BUDGET_ALERTS_ENABLED_KEY) !== "false"; // default true
 window.__budgetAlertNotified = false; // runtime flag to avoid repeated alerts
 
 /* let currentPeriod = "month";
@@ -705,6 +706,44 @@ function getFilteredItems() {
   });
 }
 
+// Group items into week buckets between a start and end timestamp
+function groupItemsByWeeks(items, startTime, endTime) {
+  const weekMs = 7 * 24 * 60 * 60 * 1000;
+  const groups = [];
+  const start = new Date(startTime);
+  start.setHours(0, 0, 0, 0);
+  const totalWeeks = Math.max(1, Math.ceil((endTime - start.getTime()) / weekMs));
+
+  for (let i = 0; i < totalWeeks; i++) {
+    const s = new Date(start.getTime() + i * weekMs);
+    const e = new Date(s.getTime() + weekMs - 1);
+    const weekItems = items.filter((it) => {
+      const t = new Date(it.createdAt || it.timestamp || it.updatedAt || Date.now()).getTime();
+      return t >= s.getTime() && t <= e.getTime();
+    });
+    groups.push({
+      weekStart: s,
+      weekEnd: e,
+      items: weekItems,
+      total: weekItems.reduce((sum, it) => sum + (parseFloat(it.price) || 0), 0),
+    });
+  }
+
+  return groups;
+}
+
+// Group consecutive weeks into months (simple grouping by month of weekStart)
+function groupWeeksByMonth(weekGroups) {
+  const months = {};
+  weekGroups.forEach((w) => {
+    const key = `${w.weekStart.getFullYear()}-${w.weekStart.getMonth() + 1}`;
+    months[key] = months[key] || { month: w.weekStart.getMonth(), year: w.weekStart.getFullYear(), weeks: [], total: 0 };
+    months[key].weeks.push(w);
+    months[key].total += w.total;
+  });
+  return Object.values(months);
+}
+
 // Main function to update all insights metrics
 /* function updateInsightsPage() {
   const filteredItems = getFilteredItems();
@@ -906,10 +945,61 @@ function updateInsightsPage() {
   const displayAvg = document.getElementById("displayAvg");
   const displayTopCategory = document.getElementById("displayTopCategory");
 
-  displayPrice.innerHTML = totalSpent;
+  displayPrice.innerHTML = `$${totalSpent.toFixed(2)}`;
   displayQty.innerHTML = totalItemsCount;
-  displayAvg.innerHTML = totalSpent / 2;
+  displayAvg.innerHTML = `$${(totalItemsCount > 0 ? (totalSpent / totalItemsCount) : 0).toFixed(2)}`;
   displayTopCategory.innerHTML = topCategory;
+
+  // Render weekly groups (and month-groups when period is month)
+  try {
+    const groupsContainerId = "insightGroupsContainer";
+    let groupsContainer = document.getElementById(groupsContainerId);
+    const parent = document.querySelector(".insights-content");
+    if (!groupsContainer && parent) {
+      groupsContainer = document.createElement("div");
+      groupsContainer.id = groupsContainerId;
+      groupsContainer.className = "insight-groups";
+      parent.appendChild(groupsContainer);
+    }
+
+    if (groupsContainer) {
+      groupsContainer.innerHTML = "";
+      const startTime = getRangeStart(currentPeriod, selectedRange);
+      const endTime = getRangeEnd();
+      const weekGroups = groupItemsByWeeks(filteredItems, startTime, endTime).reverse();
+
+      const header = document.createElement("h4");
+      header.textContent = currentPeriod === "month" ? "Monthly / Weekly Breakdown" : "Weekly Breakdown";
+      header.style.margin = "12px 0 8px";
+      groupsContainer.appendChild(header);
+
+      if (currentPeriod === "month") {
+        const months = groupWeeksByMonth(weekGroups);
+        months.forEach((m) => {
+          const mdiv = document.createElement("div");
+          mdiv.className = "month-group";
+          const monthName = new Date(m.year, m.month).toLocaleString(undefined, { month: "long", year: "numeric" });
+          mdiv.innerHTML = `<div class="month-header">${monthName} — <strong>$${m.total.toFixed(2)}</strong></div>`;
+          m.weeks.forEach((w) => {
+            const wdiv = document.createElement("div");
+            wdiv.className = "week-row";
+            wdiv.innerHTML = `${w.weekStart.toLocaleDateString()} - ${w.weekEnd.toLocaleDateString()} : <strong>$${w.total.toFixed(2)}</strong> (${w.items.length} items)`;
+            mdiv.appendChild(wdiv);
+          });
+          groupsContainer.appendChild(mdiv);
+        });
+      } else {
+        weekGroups.forEach((w) => {
+          const wdiv = document.createElement("div");
+          wdiv.className = "week-row";
+          wdiv.innerHTML = `${w.weekStart.toLocaleDateString()} - ${w.weekEnd.toLocaleDateString()} : <strong>$${w.total.toFixed(2)}</strong> (${w.items.length} items)`;
+          groupsContainer.appendChild(wdiv);
+        });
+      }
+    }
+  } catch (e) {
+    console.warn("Failed to render insight groups", e);
+  }
 
   // Update Category Breakdown
   updateCategoryBreakdown(categoryStats, totalSpent);
@@ -1322,7 +1412,7 @@ function setupChartToggle() {
       transition: all 0.2s ease;
     `;
     chartToggle.textContent = "Amount";
-    chartContainer.style.position = "relative"; // Important
+    chartContainer.style.position = "relative";
     chartContainer.appendChild(chartToggle);
   }
 
@@ -1612,7 +1702,7 @@ async function fetchMealDbRecipes(query) {
       source: meal.strSource || "TheMealDB",
     }));
   } catch (error) {
-    console.warn("MealDB fetch failed", error);
+    console.warn("Couldn't find meal", error);
     return [];
   }
 }
@@ -1645,7 +1735,7 @@ async function fetchRecipePuppyRecipes(query) {
       source: item.href,
     }));
   } catch (error) {
-    console.warn("RecipePuppy fetch failed", error);
+    console.warn("Couldn't find meal", error);
     return [];
   }
 }
@@ -2333,165 +2423,28 @@ const scrollHandler = document.querySelector(".scroll-handler");
 const deletePanelOverlay = document.getElementById("deletePanelOverlay");
 
 // Attach handler to all delete action buttons (some pages may duplicate the id)
-scrollHandler.addEventListener("click", () => {
-  deletePanel.classList.remove("show");
-  deletePanelOverlay.classList.remove("show");
-});
 
 if (deleteActions && deleteActions.length) {
   deleteActions.forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
-      // showDeletePanel();
-      deletePanel.classList.add("show");
+      closePage();
+      removeConfirmDeleteModal();
       deletePanelOverlay.classList.add("show");
+      deletePanel.classList.add("show");
     });
   });
   deletePanelOverlay.addEventListener("click", () => {
+    removeConfirmDeleteModal();
     deletePanel.classList.remove("show");
     deletePanelOverlay.classList.remove("show");
   });
 }
 
-// Create and manage a modal overlay for delete confirmation
-/* let _deleteOverlay = null;
-function ensureDeleteOverlay() {
-  if (_deleteOverlay) return _deleteOverlay;
-  _deleteOverlay = document.createElement("div");
-  _deleteOverlay.className = "delete-overlay";
-  // Ensure overlay is visible even without CSS
-  Object.assign(_deleteOverlay.style, {
-    position: "fixed",
-    top: "0",
-    left: "0",
-    right: "0",
-    bottom: "0",
-    background: "rgba(0,0,0,0.45)",
-    zIndex: "99",
-    display: "none",
-    opacity: "0",
-    transition: "opacity 180ms ease-in-out",
-  });
-  document.body.appendChild(_deleteOverlay);
-  _deleteOverlay.addEventListener("click", () => {
-    closeDeletePanel();
-  });
-  return _deleteOverlay;
-} */
-
-/*function showDeletePanel() {
-   if (settingsPage) settingsPage.classList.remove("show");
-  // Ensure overlay exists and show
-  ensureDeleteOverlay();
-  // show overlay (inline styles) - set z-index higher than overlay
-  if (_deleteOverlay) {
-    _deleteOverlay.style.display = "block";
-    _deleteOverlay.style.zIndex = "99";
-    setTimeout(() => (_deleteOverlay.style.opacity = "1"), 20);
-  }
-
-  if (deletePanel) {
-    deletePanel.classList.add("show");
-    // Ensure panel is on top of overlay
-    deletePanel.style.position = "relative";
-    deletePanel.style.zIndex = "9999";
-  } 
-
-  // Find confirm button and attach input creation to button click
-  const confirmBtn = document.getElementById("confirmDeleteAction");
-  if (confirmBtn) {
-    confirmBtn.disabled = true;
-
-    // Only show input when user clicks to delete
-    const onDeleteClick = () => {
-      // Create input if it doesn't exist yet
-      let input = deletePanel.querySelector("#confirmDeleteInput");
-      if (!input) {
-        input = document.createElement("input");
-        input.id = "confirmDeleteInput";
-        input.placeholder = 'Type "clear" to confirm delete';
-        input.className = "confirm-delete-input";
-        input.style.marginBottom = "10px";
-        const instructions = document.createElement("div");
-        instructions.className = "confirm-delete-instructions";
-        instructions.textContent =
-          'Type "clear" (without quotes) to confirm clearing all data.';
-        instructions.style.marginBottom = "10px";
-        instructions.style.fontSize = "12px";
-        // Insert above the confirm button
-        confirmBtn.parentNode.insertBefore(instructions, confirmBtn);
-        confirmBtn.parentNode.insertBefore(input, confirmBtn);
-
-        // Attach input listener for case-sensitive 'clear'
-        const onInput = (e) => {
-          const val = e.target.value.trim();
-          confirmBtn.disabled = val !== "clear";
-        };
-        input._deleteInputListener = onInput;
-        input.addEventListener("input", onInput);
-      }
-      // Focus the input
-      input.focus();
-    };
-
-    confirmBtn.removeEventListener(
-      "click",
-      confirmBtn._deleteClickListener || (() => {}),
-    );
-    confirmBtn._deleteClickListener = onDeleteClick;
-    // First click shows the input
-    confirmBtn.addEventListener("click", onDeleteClick);
-
-    // Confirm action clears localStorage and reloads
-    const onConfirm = () => {
-      // Only proceed if enabled
-      if (confirmBtn.disabled) return;
-      // Clear all local storage and reload
-      localStorage.clear();
-      showToast("All data cleared.");
-      // Close overlays and reload after short delay
-      closeDeletePanel();
-      setTimeout(() => location.reload(), 300);
-    };
-
-    // Override the click handler to check if input exists and is valid
-    confirmBtn.onclick = (e) => {
-      const input = deletePanel.querySelector("#confirmDeleteInput");
-      if (!input) {
-        // Input doesn't exist, show it
-        onDeleteClick();
-        e.preventDefault();
-      } else if (input.value.trim() === "clear") {
-        // Input exists and is correct, confirm the action
-        onConfirm();
-      }
-    };
-  }
-}*/
-
-/* function closeDeletePanel() {
-  if (deletePanel) deletePanel.classList.remove("show");
-  if (_deleteOverlay) {
-    _deleteOverlay.style.opacity = "0";
-    setTimeout(() => {
-      _deleteOverlay.style.display = "none";
-    }, 200);
-  }
-  // cleanup input state and remove it so it appears fresh next time
-  const input = deletePanel?.querySelector("#confirmDeleteInput");
-  const instructions = deletePanel?.querySelector(
-    ".confirm-delete-instructions",
-  );
-  if (input) {
-    input.value = "";
-    input.remove();
-  }
-  if (instructions) {
-    instructions.remove();
-  }
-  const confirmBtn = document.getElementById("confirmDeleteAction");
-  if (confirmBtn) confirmBtn.disabled = true;
-} */
+scrollHandler.addEventListener("click", () => {
+  deletePanel.classList.remove("show");
+  deletePanelOverlay.classList.remove("show");
+});
 
 const faqBox = document.querySelector(".faqs-box");
 const faqNAnsWrapper = document.querySelector(".faq-n-ans-wrapper");
@@ -2555,87 +2508,79 @@ showMoreFaqs.addEventListener("click", () => {
 const cancelAction = document.getElementById("cancelAction");
 const confirmDeleteAction = document.getElementById("confirmDeleteAction");
 
-const confirmDelete = document.createElement("div");
-confirmDelete.id = "confirmDelete";
-confirmDelete.innerHTML = `
-      <input type="text" id="confirmDeleteInput" placeholder="'clear'">;
+function ensureConfirmDeleteModal() {
+  let modal = document.getElementById("confirmDelete");
+  if (modal) return modal;
+  modal = document.createElement("div");
+  modal.id = "confirmDelete";
+  modal.innerHTML = `
+      <input type="text" id="confirmDeleteInput" placeholder="'clear'">
       <div class="delete-instruction">
         <p>Type "clear" to confirm delete.</p>
       </div>
-      <button id="clearDataBtn">Delete</button>
+      <button id="clearDataBtn" disabled>Delete</button>
       <div class="delete-notice">
         <p>This action cannot be reversed!</p>
       </div>
     `;
-const confirmDeleteInput = document.getElementById("confirmDeleteInput");
-const clearDataBtn = document.getElementById("clearDataBtn");
+  document.body.appendChild(modal);
 
-function onDeleteClick() {
-  // Create input if it doesn't exist yet
-  // let input = deletePanel.querySelector("#confirmDeleteInput");
-  // if (!input) {
-  const confirmDelete = document.createElement("div");
-  confirmDelete.id = "confirmDelete";
-  confirmDelete.innerHTML = `
-      <input type="text" id="confirmDeleteInput" placeholder="'clear'">;
-      <div class="delete-instruction">
-        <p>Type "clear" to confirm delete.</p>
-      </div>
-      <button id="clearDataBtn">Delete</button>
-      <div class="delete-notice">
-        <p>This action cannot be reversed!</p>
-      </div>
-    `;
-  document.body.appendChild(confirmDelete);
-  const confirmDeleteInput = document.getElementById("confirmDeleteInput");
-  const clearDataBtn = document.getElementById("clearDataBtn");
+  const input = modal.querySelector("#confirmDeleteInput");
+  const clearDataBtn = modal.querySelector("#clearDataBtn");
 
-  /* input = document.createElement("input");
-  input.id = "confirmDeleteInput";
-  input.placeholder = 'Type "clear" to confirm delete';
-  input.className = "confirm-delete-input";
-  input.style.marginBottom = "10px";
-  const instructions = document.createElement("div");
-  instructions.className = "confirm-delete-instructions";
-  instructions.textContent =
-    'Type "clear" (without quotes) to confirm clearing all data.';
-  instructions.style.marginBottom = "10px";
-  instructions.style.fontSize = "12px";
-  // Insert above the confirm button
-  confirmDeleteAction.parentNode.insertBefore(instructions, confirmDeleteAction);
-  confirmDeleteAction.parentNode.insertBefore(input, confirmDeleteAction); */
+  input.addEventListener("input", () => {
+    const ok = input.value.trim().toLowerCase() === "clear";
+    clearDataBtn.disabled = !ok;
+    if (ok) clearDataBtn.classList.remove("disabled");
+    else clearDataBtn.classList.add("disabled");
+  });
 
-  // Attach input listener for case-sensitive 'clear'
-  /* const onInput = (e) => {
-    const val = e.target.value.trim();
-    confirmDeleteAction.disabled = val !== "clear";
-  };
-  input._deleteInputListener = onInput;
-  input.addEventListener("input", onInput); */
-  // }
-  // Focus the input
-  // input.focus();
+  clearDataBtn.addEventListener("click", () => {
+    if (clearDataBtn.disabled) return;
+    localStorage.clear();
+    showToast("All data cleared.");
+    modal.remove();
+    closeDeletePanel();
+    setTimeout(() => location.reload(), 300);
+  });
 
-  return;
+  return modal;
 }
 
-confirmDeleteAction.addEventListener("click", onDeleteClick);
-/* clearDataBtn.addEventListener("click", () => {
-  if (confirmDeleteInput.value.trim() === "clear") {
-    
-    clearDataBtn.addEventListener("click", () => {
-        localStorage.clear();
-      showToast("All data cleared.");
-      confirmDelete.remove();
-      closeDeletePanel();
-      setTimeout(() => location.reload(), 300);
-      profilePage.style.backgroundColor = "red";
-      console.log("Must clear data!");
-    })
-  }
-}) */
+function removeConfirmDeleteModal() {
+  const modal = document.getElementById("confirmDelete");
+  if (modal) modal.remove();
+}
+
+if (confirmDeleteAction) {
+  confirmDeleteAction.addEventListener("click", (e) => {
+    e.stopPropagation();
+    // If modal isn't shown yet, create and show it; otherwise focus existing input
+    const existing = document.getElementById("confirmDelete");
+    if (!existing) {
+      const modal = ensureConfirmDeleteModal();
+      deletePanelOverlay.classList.add("show");
+      const input = modal.querySelector("#confirmDeleteInput");
+      input && input.focus();
+    } else {
+      const input = existing.querySelector("#confirmDeleteInput");
+      if (input && input.value.trim().toLowerCase() === "clear") {
+        const btn = existing.querySelector("#clearDataBtn");
+        btn && btn.click();
+      } else {
+        input && input.focus();
+      }
+    }
+  });
+}
 
 cancelAction.addEventListener("click", () => {
+  removeConfirmDeleteModal();
+  closeDeletePanel();
+});
+
+deletePanelOverlay.addEventListener("click", () => {
+  removeConfirmDeleteModal();
   closeDeletePanel();
 });
 
@@ -2645,6 +2590,23 @@ function closeDeletePanel() {
 }
 
 // ===== MENU =====
+const toGetListBtn = document.getElementById("toGetListBtn");
+const favoritesBtn = document.getElementById("favoritesBtn");
+const historyBtn = document.getElementById("historyBtn");
+const dashboardBtn = document.getElementById("dashboardBtn");
+const scheduledBtn = document.getElementById("scheduledBtn");
+
+const addToGet = document.getElementById("addToGet");
+const addToGetModal = document.getElementById("addToGetModal");
+const toGetModalOverlay = document.getElementById("toGetModalOverlay");
+const addToGetBtn = document.getElementById("addToGetBtn");
+// const addFromRecipeBtn = document.querySelector("#addFromRecipeBtn");
+const toGetItemName = document.querySelector("#toGetItemName");
+const toGetItemQty = document.querySelector("#toGetItemQty");
+const toGetItemPrice = document.querySelector("#toGetItemPrice");
+const toGetItemStore = document.querySelector("#toGetItemStore");
+const TO_GET_STORAGE_KEY = "planup_to_get_items";
+
 menuBtn.addEventListener("click", () => {
   menuPage.classList.add("show");
   menuOverlay.classList.add("show");
@@ -2699,7 +2661,7 @@ if (addFromRecipeBtn) {
       // closeToGetListPage();
       toGetListPage.style.transform = "translateX(100%)";
       openRecipePage();
-    } // Make sure this function exists
+    }
   });
 }
 
@@ -2714,28 +2676,18 @@ function closeToGetModal() {
 
   if (addToGetModal) addToGetModal.classList.remove("show");
   if (toGetModalOverlay) toGetModalOverlay.classList.remove("show");
+  // if (toGetListPage.style.transform = "scale > 1") toGetListPage.style.transform = "scale(1)";
 
-  // Optional: Reset form fields
   clearToGetModalFields();
 }
 
-// Also define the item modal closer if not already
-function closeToGetItemModal() {
-  const toGetItemModal = document.querySelector(".to-get-item-modal");
-  if (toGetItemModal) toGetItemModal.classList.remove("show");
-}
-
-window.closeToGetItemModal = function () {
-  const toGetItemModal = document.querySelector(".to-get-item-modal");
-  if (toGetItemModal) toGetItemModal.classList.remove("show");
-};
-
-// ===== BACK BUTTONS =====
 // ===== BACK BUTTONS & TO-GET LIST HANDLERS =====
 const backFromPage = document.querySelectorAll(".back-btn");
 
 function closePage() {
   if (notificationPage) notificationPage.classList.remove("show");
+  if (reminderPage) reminderPage.classList.remove("show");
+  if (mealCoursePage) mealCoursePage.classList.remove("show");
   if (favoritesPage) favoritesPage.classList.remove("show");
   if (scheduledPage) scheduledPage.classList.remove("show");
   if (historyPage) historyPage.classList.remove("show");
@@ -2758,24 +2710,6 @@ function closePage() {
 backFromPage.forEach((arrow) => {
   arrow.addEventListener("click", closePage);
 });
-
-// ===== DRAWER MENU ITEMS =====
-const toGetListBtn = document.getElementById("toGetListBtn");
-const favoritesBtn = document.getElementById("favoritesBtn");
-const historyBtn = document.getElementById("historyBtn");
-const dashboardBtn = document.getElementById("dashboardBtn");
-const scheduledBtn = document.getElementById("scheduledBtn");
-
-const addToGet = document.getElementById("addToGet");
-const addToGetModal = document.getElementById("addToGetModal");
-const toGetModalOverlay = document.getElementById("toGetModalOverlay");
-const addToGetBtn = document.getElementById("addToGetBtn");
-// const addFromRecipeBtn = document.querySelector("#addFromRecipeBtn");
-const toGetItemName = document.querySelector("#toGetItemName");
-const toGetItemQty = document.querySelector("#toGetItemQty");
-const toGetItemPrice = document.querySelector("#toGetItemPrice");
-const toGetItemStore = document.querySelector("#toGetItemStore");
-const TO_GET_STORAGE_KEY = "planup_to_get_items";
 
 if (toGetModalOverlay) {
   toGetModalOverlay.addEventListener("click", closeToGetModal);
@@ -2803,8 +2737,7 @@ function createToGetItemElement(item) {
   div.dataset.itemId = item.id;
   div.innerHTML = `
     <div class="to-get-item-icon">
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M6 19h12a2 2 0 0 0 2-2v-6a6 6 0 0 0-12 0v6a2 2 0 0 0 2 2Zm-2-8h14a1 1 0 0 1 1 1v2H3v-2a1 1 0 0 1 1-1Zm9-7a2 2 0 0 1 2 2v1h-2V6h-2v2h-2V6h-2v2H8V6a2 2 0 0 1 2-2h3Zm-6 6h10v1H7v-1Z"/></svg>
-    </div>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 2v2m4-2v2m2 4a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1M6 2v2"/></svg>    </div>
     <div class="to-get-item-details">
       <div class="to-get-item-name">${item.name}</div>
       <div class="to-get-item-meta">
@@ -2866,8 +2799,8 @@ toGetItemModalOptions.forEach((option) => {
       if (toGetItemStore) toGetItemStore.value = item.store || "";
       addToGetModal?.classList.add("show");
       toGetModalOverlay?.classList.add("show");
-      if (toGetListPage) toGetListPage.style.transform = "scale(1.01)";
-      showToast("Edit the item and save changes.");
+      // if (toGetListPage) toGetListPage.style.transform = "scale(1.01)";
+      // showToast("Edit the item and save changes.");
     }
 
     if (action === "Add to item list" && itemIndex !== -1) {
@@ -3123,7 +3056,7 @@ if (feedbackBtn) {
 const sortBtn = document.getElementById("sortBtn");
 const sortModal = document.getElementById("sortModal");
 const sortOverlay = document.querySelector(".sort-overlay");
-const sortIndicator = document.getElementById("sortIndicator");
+const sortOrder = document.getElementById("sortOrder");
 const sortSvg = document.getElementById("sortSvg");
 const sortPty = document.querySelectorAll(".sort-pty");
 const filterBar = document.querySelector(".filter-bar");
@@ -3191,9 +3124,9 @@ sortOverlay.addEventListener("click", () => {
   sortModal.classList.remove("show");
   sortOverlay.classList.remove("show");
 });
-sortSvg.addEventListener("click", () => {
-  sortIndicator.classList.toggle("accend");
-});
+/* sortSvg.addEventListener("click", () => {
+  sortOrder.classList.toggle("accend");
+}); */
 
 // ===== FAB MENU =====
 const fab = document.getElementById("fab");
@@ -3323,12 +3256,13 @@ if (frequentItemsBtn) {
   });
 }
 
+const mealCoursePage = document.getElementById("mealCoursePage");
 if (smartSort) {
   smartSort.addEventListener("click", (e) => {
     e.stopPropagation();
     // Trigger sort modal
-    sortModal.classList.toggle("show");
-    sortOverlay.classList.toggle("show");
+    mealCoursePage.classList.toggle("show");
+    // sortOverlay.classList.toggle("show");
     closeFab();
   });
 }
@@ -3612,7 +3546,10 @@ const concurrentAddBtn = document.getElementById("concurrentAddBtn");
 if (concurrentAddBtn) {
   concurrentAddBtn.addEventListener("click", () => {
     addToConcurrentList();
-    if (concurrentContainer && !concurrentContainer.classList.contains("expand")) {
+    if (
+      concurrentContainer &&
+      !concurrentContainer.classList.contains("expand")
+    ) {
       concurrentContainer.classList.add("expand");
     }
   });
@@ -3645,7 +3582,8 @@ function isAddItemFormPartiallyFilled() {
   const quantity = quantityInput?.value.trim() || "";
   const store = storeInput?.value.trim() || "";
 
-  return Boolean(itemName || price || quantity || store);
+  const hasQuantityValue = quantity !== "" && quantity !== "1";
+  return Boolean(itemName || price || store || hasQuantityValue);
 }
 
 function removeConcurrentItem(index) {
@@ -3659,7 +3597,10 @@ function editConcurrentItem(index) {
   concurrentItemsList.splice(index, 1);
   renderConcurrentItems();
   populateFormFromItem(item);
-  if (concurrentContainer && !concurrentContainer.classList.contains("expand")) {
+  if (
+    concurrentContainer &&
+    !concurrentContainer.classList.contains("expand")
+  ) {
     concurrentContainer.classList.add("expand");
   }
   showToast(`Editing queued item: ${item.name}`);
@@ -3720,7 +3661,8 @@ if (concurrentContainer) {
       let position = "";
 
       switch (true) {
-        case relativeTop < containerHeight * 0.33 && relativeLeft < containerWidth * 0.66:
+        case relativeTop < containerHeight * 0.33 &&
+          relativeLeft < containerWidth * 0.66:
           position = "isTopLeft";
           break;
         case relativeTop < containerHeight * 0.33 &&
@@ -3822,6 +3764,49 @@ function createItemRow(quantity, price) {
   `;
   return row;
 }
+
+// Render item details into insights page's details area
+function showItemDetails(item) {
+  const wrapper = document.querySelector(".item-details-wrapper");
+  if (!wrapper) return;
+  const nameEl = wrapper.querySelector(".name-detail");
+  const storeEl = wrapper.querySelector(".store-detail");
+  const qtyEl = wrapper.querySelector(".qty-detail");
+  const priceEl = wrapper.querySelector(".price-detail");
+  const dateEl = wrapper.querySelector(".date-detail");
+  const agoEl = wrapper.querySelector(".ago-detail");
+
+  const now = new Date();
+  const created = item.createdAt ? new Date(item.createdAt) : now;
+
+  if (nameEl) nameEl.textContent = item.name || "";
+  if (storeEl) storeEl.textContent = `Store: ${item.store || "Unknown"}`;
+  if (qtyEl) qtyEl.textContent = `Qty: ${item.quantity || 1}`;
+  if (priceEl) priceEl.textContent = `Price: $${(item.price || 0).toFixed(2)}`;
+  if (dateEl)
+    dateEl.textContent = `${created.getDate()}|${(created.getMonth() + 1).toString().padStart(2, "0")}|${String(created.getFullYear()).slice(-2)}`;
+  if (agoEl) {
+    const diff = Math.round((now - created) / (1000 * 60 * 60 * 24));
+    agoEl.textContent = `≈added ${diff}d ago`;
+  }
+
+  // reveal wrapper if collapsed
+  wrapper.style.display = "";
+  // scroll to bottom of insights page so details visible
+  setTimeout(() => {
+    wrapper.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, 80);
+}
+
+// Close button for item details (uses HTML closeItemDetails id)
+document.addEventListener('click', (e) => {
+  const closeBtn = document.getElementById('closeItemDetails');
+  if (!closeBtn) return;
+  if (e.target === closeBtn) {
+    const wrapper = document.querySelector('.item-details-wrapper');
+    if (wrapper) wrapper.style.display = 'none';
+  }
+});
 
 function updateItemCardTotals(itemCardSec) {
   const itemRows = itemCardSec.querySelectorAll(".indie-item-info");
@@ -4025,6 +4010,39 @@ function initializeInfoListeners() {
         window.location.href = url;
       });
     });
+
+  // Add listener to each item card section to show details when clicked
+  document.querySelectorAll('.item-card-sec').forEach((section) => {
+    if (section.dataset.detailListener === 'true') return;
+    section.dataset.detailListener = 'true';
+
+    section.addEventListener('click', (e) => {
+      // Ignore clicks on buttons/controls inside the card
+      if (e.target.closest('.item-options-btn') || e.target.closest('.info-source-btn') || e.target.closest('.source-badge') || e.target.closest('.concurrent-actions-row')) return;
+
+      const id = section.dataset.itemId;
+      if (!id) return;
+      const found = items.find((it) => String(it.id) === String(id));
+      if (found) {
+        // Open insights page/tab so details section is visible
+        const navBtn = document.getElementById('navInsights');
+        if (navBtn) navBtn.click();
+
+        // small delay to allow insights page to render then populate details
+        setTimeout(() => {
+          showItemDetails(found);
+        }, 60);
+      }
+    });
+
+    // keyboard support
+    section.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        section.click();
+      }
+    });
+  });
 }
 
 function initializeInfoRotation() {
@@ -4049,9 +4067,10 @@ function initializeInfoRotation() {
   }, 10000);
 }
 
-function createItemCardSection(itemName, quantity, price) {
+function createItemCardSection(itemName, quantity, price, itemId) {
   const section = document.createElement("div");
   section.className = "item-card-sec";
+  if (itemId) section.dataset.itemId = itemId;
 
   const accent = getRandomAccentColor(hashString(itemName));
   const infoStates = getItemInfoStates(itemName, "Other");
@@ -4091,13 +4110,24 @@ function createItemCardSection(itemName, quantity, price) {
         <div class="item-qty">${formatQuantity(quantity)}</div>
         <div class="item-price">$${price.toFixed(2)}</div>
       </div>
+      <button type="button" class="item-options-btn" aria-label="More options">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
+        </svg>
+      </button>
     </div>
   `;
 
   return section;
 }
 
-function createNewCategoryCardSection(category, itemName, quantity, price) {
+function createNewCategoryCardSection(
+  category,
+  itemName,
+  quantity,
+  price,
+  itemId,
+) {
   const newCategoryCard = document.createElement("div");
   newCategoryCard.innerHTML = `
     <div class="card-header">
@@ -4110,7 +4140,9 @@ function createNewCategoryCardSection(category, itemName, quantity, price) {
       </div>
     </div>
   `;
-  newCategoryCard.appendChild(createItemCardSection(itemName, quantity, price));
+  newCategoryCard.appendChild(
+    createItemCardSection(itemName, quantity, price, itemId),
+  );
   return newCategoryCard;
 }
 
@@ -4161,7 +4193,7 @@ sortPty.forEach((pty) => {
 // Toggle sort direction when clicking the arrow icon
 sortSvg.addEventListener("click", (e) => {
   e.stopPropagation();
-  sortIndicator.classList.toggle("accend");
+  sortOrder.classList.toggle("accend");
 
   // Toggle direction
   currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
@@ -4481,58 +4513,58 @@ function updateFilterSortVisibility(hasVisibleCategories = true) {
 
       let updatedQuantity = quantity;
       let updatedPrice = price;
+  const itemId = existingDataItem ? existingDataItem.id : Date.now();
 
-      if (existingDataItem) {
-        updatedQuantity = existingDataItem.quantity + quantity;
-        updatedPrice = existingDataItem.price + price;
-        existingDataItem.quantity = updatedQuantity;
-        existingDataItem.price = updatedPrice;
-        existingDataItem.updatedAt = new Date().toISOString();
-      }
+  if (existingDataItem) {
+    updatedQuantity = existingDataItem.quantity + quantity;
+    updatedPrice = existingDataItem.price + price;
+    existingDataItem.quantity = updatedQuantity;
+    existingDataItem.price = updatedPrice;
+    existingDataItem.updatedAt = new Date().toISOString();
+  }
 
-      if (existingItemSection) {
-        const itemCard = existingItemSection.querySelector(".item-card");
-        const qtyEl = itemCard?.querySelector(".item-qty");
-        const priceEl = itemCard?.querySelector(".item-price");
+  if (existingItemSection) {
+    const itemCard = existingItemSection.querySelector(".item-card");
+    const qtyEl = itemCard?.querySelector(".item-qty");
+    const priceEl = itemCard?.querySelector(".item-price");
 
-        if (qtyEl) qtyEl.textContent = formatQuantity(updatedQuantity);
-        if (priceEl) priceEl.textContent = `$${updatedPrice.toFixed(2)}`;
+    if (qtyEl) qtyEl.textContent = formatQuantity(updatedQuantity);
+    if (priceEl) priceEl.textContent = `$${updatedPrice.toFixed(2)}`;
 
-        existingItemSection.dataset.infoStates = JSON.stringify(
-          getItemInfoStates(itemName, category),
-        );
-        updateCardInfoState(existingItemSection, 0);
-      }
+    existingItemSection.dataset.infoStates = JSON.stringify(
+      getItemInfoStates(itemName, category),
+    );
+    updateCardInfoState(existingItemSection, 0);
+  }
 
-      if (!existingItemSection) {
-        if (categoryCard) {
-          categoryCard.appendChild(
-            createItemCardSection(itemName, updatedQuantity, updatedPrice),
-          );
-        } else if (cardContainer) {
-          const newCategoryCard = document.createElement("div");
-          newCategoryCard.className = "category-card";
-          newCategoryCard.appendChild(
-            createNewCategoryCardSection(
-              category,
-              itemName,
-              updatedQuantity,
-              updatedPrice,
-            ),
-          );
-          cardContainer.appendChild(newCategoryCard);
-        }
-      }
+  if (!existingItemSection) {
+    if (categoryCard) {
+      categoryCard.appendChild(
+        createItemCardSection(itemName, updatedQuantity, updatedPrice, itemId),
+      );
+    } else if (cardContainer) {
+      const newCategoryCard = document.createElement("div");
+      newCategoryCard.className = "category-card";
+      newCategoryCard.appendChild(
+        createNewCategoryCardSection(
+          category,
+          itemName,
+          updatedQuantity,
+          updatedPrice,
+          itemId,
+        ),
+      );
+      cardContainer.appendChild(newCategoryCard);
+    }
+  }
 
-      if (!existingDataItem) {
-        items.push({
-          id: Date.now(),
-          name: itemName,
-          category: category,
+  if (!existingDataItem) {
+    items.push({
+      id: itemId,
           quantity: updatedQuantity,
           price: updatedPrice,
           timestamp: new Date().toISOString(),
-          createdAt: new Date(),
+          createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         });
       }
@@ -4571,20 +4603,132 @@ function updateFilterSortVisibility(hasVisibleCategories = true) {
 
 // ====================== CONCURRENT ITEMS & STORE-BASED SAVING ======================
 let concurrentItemsList = [];
+let editingInventoryItemId = null; // id of item being edited via add item modal
+const HISTORY_KEY = "planup_history";
+
+function loadHistory() {
+  try {
+    const stored = localStorage.getItem(HISTORY_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveHistory(hist) {
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(hist));
+}
+
+function addToHistory(item, action = "used") {
+  const hist = loadHistory();
+  hist.unshift({
+    id: Date.now(),
+    itemId: item.id || null,
+    name: item.name || item,
+    category: item.category || "",
+    price: item.price || 0,
+    quantity: item.quantity || 1,
+    action,
+    time: new Date().toISOString(),
+  });
+  saveHistory(hist);
+  renderHistory();
+}
+
+function renderHistory() {
+  const hist = loadHistory();
+  const container = document.querySelector("#historyPage .history-list");
+  if (!container && document.getElementById("historyPage")) {
+    const page = document.getElementById("historyPage");
+    const list = document.createElement("div");
+    list.className = "history-list";
+    page.appendChild(list);
+  }
+  const list = document.querySelector("#historyPage .history-list");
+  if (!list) return;
+  list.innerHTML = "";
+  hist.forEach((h) => {
+    const div = document.createElement("div");
+    div.className = "history-item";
+    div.innerHTML = `
+      <div>
+        <div>${h.name}</div>
+        <div class="meta">${h.action} • ${new Date(h.time).toLocaleString()}</div>
+      </div>
+      <div class="meta">${h.quantity} • $${(h.price || 0).toFixed(2)}</div>
+    `;
+    list.appendChild(div);
+  });
+}
 
 function getFormItemData() {
   const itemNameInput = document.getElementById("itemNameInput");
   const quantityInput = document.getElementById("quantityInput");
   const priceInput = document.getElementById("priceInput");
   const storeInput = document.getElementById("storeInput");
+  const selectedCategory = document.querySelector(".category-item.active");
+  const enteredName = itemNameInput?.value.trim() || "";
 
   return {
-    name: itemNameInput?.value.trim(),
+    name: enteredName,
     quantity: Math.max(1, parseInt(quantityInput?.value, 10) || 1),
     price: parseFloat(priceInput?.value) || 0,
     store: storeInput?.value.trim() || "Unknown Store",
+    category:
+      selectedCategory?.textContent.trim() ||
+      (enteredName ? suggestSmartCategory(enteredName) : "Other"),
   };
 }
+
+// Autofocus inputs and allow Enter navigation in add item modal
+function ensureAddItemModalBehavior() {
+  const itemNameInput = document.getElementById("itemNameInput");
+  const quantityInput = document.getElementById("quantityInput");
+  const priceInput = document.getElementById("priceInput");
+  const storeInput = document.getElementById("storeInput");
+  const inputs = [itemNameInput, storeInput, quantityInput, priceInput].filter(
+    Boolean,
+  );
+
+  // Focus first when modal opens
+  const observer = new MutationObserver((mut) => {
+    mut.forEach((m) => {
+      if (m.attributeName === "class") {
+        if (addItemModal.classList.contains("show")) {
+          setTimeout(() => inputs[0]?.focus(), 60);
+        }
+      }
+    });
+  });
+  if (addItemModal) observer.observe(addItemModal, { attributes: true });
+
+  // Enter navigation
+  inputs.forEach((inp, idx) => {
+    inp.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+
+        const hasCurrentFormData = isAddItemFormPartiallyFilled();
+        const hasConcurrentItems =
+          Array.isArray(concurrentItemsList) && concurrentItemsList.length > 0;
+
+        if (hasConcurrentItems && !hasCurrentFormData) {
+          saveItemBtn && saveItemBtn.click();
+          return;
+        }
+
+        const next = inputs[idx + 1];
+        if (next) next.focus();
+        else {
+          // last input -> trigger save
+          saveItemBtn && saveItemBtn.click();
+        }
+      }
+    });
+  });
+}
+
+ensureAddItemModalBehavior();
 
 function addToConcurrentList() {
   const item = getFormItemData();
@@ -4610,6 +4754,28 @@ function addToConcurrentList() {
   showToast(`+ ${item.name} added to concurrent items`);
 }
 
+// Add/Edit saving behaviour: when add item modal is opened for editing, save updates
+function applyAddItemModalEditIfNeeded(savedItem) {
+  if (!editingInventoryItemId) return false;
+  const idx = items.findIndex(
+    (it) => String(it.id) === String(editingInventoryItemId),
+  );
+  if (idx === -1) return false;
+  items[idx] = {
+    ...items[idx],
+    name: savedItem.name,
+    quantity: savedItem.quantity,
+    price: savedItem.price,
+    store: savedItem.store,
+    updatedAt: new Date().toISOString(),
+  };
+  localStorage.setItem("planup_items", JSON.stringify(items));
+  editingInventoryItemId = null;
+  renderSavedItems();
+  updateBudgetProgress();
+  return true;
+}
+
 function renderConcurrentItems() {
   const container = document.querySelector(".concurrent-items-container");
   if (!container) return;
@@ -4617,7 +4783,7 @@ function renderConcurrentItems() {
   container.innerHTML = "";
 
   if (concurrentItemsList.length === 0) {
-    container.innerHTML = `<div class="concurrent-empty">No concurrent items yet</div>`;
+    container.innerHTML = `<div class="concurrent-empty"><p>Empty</p></div>`;
   } else {
     concurrentItemsList.forEach((item, index) => {
       const div = document.createElement("div");
@@ -4646,6 +4812,466 @@ function renderConcurrentItems() {
 
   updateConcurrentAddButtonLabel();
 }
+
+// ITEM OPTIONS MODAL (open from the three-dot button on card)
+function ensureItemOptionsModal() {
+  let modal = document.getElementById("itemOptionsModal");
+  if (modal) return modal;
+  modal = document.createElement("div");
+  modal.id = "itemOptionsModal";
+  modal.className = "item-options-modal";
+  modal.style.position = "fixed";
+  modal.style.zIndex = 13000;
+  modal.style.background = "hsl(0, 0%, 90%, .2)";
+  modal.style.backdropFilter = "blur(10px)";
+  modal.style.borderTop = "1px solid #eee";
+  modal.style.borderRight = "1px solid #eee";
+  modal.style.borderRadius = "12px";
+  modal.style.boxShadow = "0 10px 30px rgba(0,0,0,0.12)";
+  modal.style.padding = "8px";
+  document.body.appendChild(modal);
+  return modal;
+}
+
+function openItemOptionsModal(cardSection, anchorRect) {
+  const modal = ensureItemOptionsModal();
+  modal.innerHTML = "";
+  const name = (
+    cardSection.querySelector(".item-name")?.textContent || ""
+  ).trim();
+  const itemId = cardSection.dataset.itemId || null;
+
+  const makeBtn = (label) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = label;
+    b.style.display = "block";
+    b.style.width = "180px";
+    b.style.margin = "4px 0";
+    b.style.padding = "8px 10px";
+    b.style.borderRadius = "8px";
+    b.style.border = "none";
+    b.style.cursor = "pointer";
+    b.style.background = "hsl(0, 0%, 80%, .6)";
+    return b;
+  };
+
+  const usedBtn = makeBtn("Mark used");
+  const deleteBtn = makeBtn("Delete");
+  const seeRecipesBtn = makeBtn("Show details");
+  const editBtn = makeBtn("Edit item");
+  const remindBtn = makeBtn("Set reminder");
+
+  modal.appendChild(document.createTextNode(name));
+  modal.appendChild(document.createElement("br"));
+  modal.appendChild(usedBtn);
+  modal.appendChild(deleteBtn);
+  modal.appendChild(seeRecipesBtn);
+  modal.appendChild(editBtn);
+  modal.appendChild(remindBtn);
+
+  // Position modal near anchorRect
+  const padding = 8;
+  const top = Math.min(
+    window.innerHeight - 160,
+    Math.max(8, anchorRect.top + window.scrollY - padding),
+  );
+  const left = Math.min(
+    window.innerWidth - 240,
+    Math.max(8, anchorRect.left + window.scrollX - 220 + anchorRect.width),
+  );
+  modal.style.top = `${top}px`;
+  modal.style.left = `${left}px`;
+
+  const closeModal = () => {
+    modal.style.display = "none";
+  };
+  modal.style.display = "block";
+
+  usedBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    // find item in items by id or name
+    const item = items.find(
+      (it) =>
+        String(it.id) === String(itemId) ||
+        (it.name && it.name.trim() === name),
+    );
+    if (item) {
+      // remove from items
+      items = items.filter((it) => it !== item);
+      localStorage.setItem("planup_items", JSON.stringify(items));
+      addToHistory(item, "used");
+      // remove DOM
+      const cat = cardSection.closest(".category-card");
+      if (cardSection) cardSection.remove();
+      updateBudgetProgress();
+      updateCategoryEmptyState();
+      updateGlobalEmptyState();
+      showNotification({
+        message: `${item.name} used`,
+        type: "success",
+        sound: "iphone",
+        autoHide: true,
+        delay: 0,
+      });
+    }
+    closeModal();
+  });
+
+  deleteBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const item = items.find(
+      (it) =>
+        String(it.id) === String(itemId) ||
+        (it.name && it.name.trim() === name),
+    );
+    if (item) {
+      items = items.filter((it) => it !== item);
+      localStorage.setItem("planup_items", JSON.stringify(items));
+      addToHistory(item, "deleted");
+      if (cardSection) cardSection.remove();
+      updateBudgetProgress();
+      updateCategoryEmptyState();
+      updateGlobalEmptyState();
+      showNotification({
+        message: `${item.name} deleted`,
+        type: "warning",
+        sound: "metal",
+        autoHide: true,
+        delay: 0,
+      });
+    }
+    closeModal();
+  });
+
+  function createItemDetailsSection(item) {
+    const detailsContainer = document.querySelector("item-details-wrapper");
+    const wrapper = document.querySelector(".item-details-wrapper");
+    if (!wrapper) return;
+    const nameEl = wrapper.querySelector(".name-detail");
+    const storeEl = wrapper.querySelector(".store-detail");
+    const qtyEl = wrapper.querySelector(".qty-detail");
+    const priceEl = wrapper.querySelector(".price-detail");
+    const dateEl = wrapper.querySelector(".date-detail");
+    const agoEl = wrapper.querySelector(".ago-detail");
+    if (nameEl) nameEl.textContent = item.name || "";
+    if (storeEl) storeEl.textContent = `Store: ${item.store || "Unknown"}`;
+    if (qtyEl) qtyEl.textContent = `Qty: ${item.quantity || 1}`;
+    if (priceEl)
+      priceEl.textContent = `Price: $${(item.price || 0).toFixed(2)}`;
+    if (dateEl)
+      dateEl.textContent = `${created.getDate()}|${(created.getMonth() + 1).toString().padStart(2, "0")}|${String(created.getFullYear()).slice(-2)}`;
+    if (agoEl) {
+      const diff = Math.round((now - created) / (1000 * 60 * 60 * 24));
+      agoEl.textContent = `≈added ${diff}d ago`;
+    }
+    const itemDetailsSection = document.createElement("div");
+    itemDetailsSection.className = "detailsSection";
+    itemDetailsSection.innerHTML = `
+    <div class="item-details">
+          <div class="item-details-blur-ground">
+            <div class="main-details">
+              <div class="name-detail">Rice</div>
+              <div class="details-row">
+                <div class="store-detail">Store: Amazon</div>
+                <div class="qty-detail">Qty: 20</div>
+                <div class="price-detail">Price: $30.00</div>
+              </div>
+              <div class="time-detail">
+                <div class="date-detail">15|05|26</div>
+                <div class="ago-detail">≈added 2d ago</div>
+              </div>
+            </div>
+            <div class="more-details">
+              <div class="message-details"></div>
+              <div class="message-details-hdr">Recipe</div>
+              <div class="message-details-body">
+                <p>There are a few recipes you can make with this item based on your item list</p>
+              </div>
+              <div class="message-details-body">
+                <p>There are a few recipes you can make with this item based on your item list</p>
+              </div>
+              <div class="message-details-body">
+                <p>There are a few recipes you can make with this item based on your item list</p>
+              </div>
+              <div class="message-details-body">
+                <p>There are a few recipes you can make with this item based on your item list</p>
+              </div>
+            </div>
+            <div class="price-insights-details">
+              <div class="price-chart"></div>
+            </div>
+            <div class="item-recipe-details">
+              <h2>A few recipes you can make with this item</h2>
+              <div class="recipe-item">
+                <div class="meal"></div>
+                <div class="meal-details">
+                  <div class="meal-name-tab">
+                    <div class="meal-name">Burger
+                      <div class="place-of-recipe"><i>Australian</i></div>
+                    </div>
+                    <div class="meal-actions">
+                      <div class="like-item">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+                          <path fill="currentColor"
+                            d="m8.962 18.91l.464-.588zM12 5.5l-.54.52a.75.75 0 0 0 1.08 0zm3.038 13.41l.465.59zm-5.612-.588C7.91 17.127 6.253 15.96 4.938 14.48C3.65 13.028 2.75 11.335 2.75 9.137h-1.5c0 2.666 1.11 4.7 2.567 6.339c1.43 1.61 3.254 2.9 4.68 4.024zM2.75 9.137c0-2.15 1.215-3.954 2.874-4.713c1.612-.737 3.778-.541 5.836 1.597l1.08-1.04C10.1 2.444 7.264 2.025 5 3.06C2.786 4.073 1.25 6.425 1.25 9.137zM8.497 19.5c.513.404 1.063.834 1.62 1.16s1.193.59 1.883.59v-1.5c-.31 0-.674-.12-1.126-.385c-.453-.264-.922-.628-1.448-1.043zm7.006 0c1.426-1.125 3.25-2.413 4.68-4.024c1.457-1.64 2.567-3.673 2.567-6.339h-1.5c0 2.198-.9 3.891-2.188 5.343c-1.315 1.48-2.972 2.647-4.488 3.842zM22.75 9.137c0-2.712-1.535-5.064-3.75-6.077c-2.264-1.035-5.098-.616-7.54 1.92l1.08 1.04c2.058-2.137 4.224-2.333 5.836-1.596c1.659.759 2.874 2.562 2.874 4.713zm-8.176 9.185c-.526.415-.995.779-1.448 1.043s-.816.385-1.126.385v1.5c.69 0 1.326-.265 1.883-.59c.558-.326 1.107-.756 1.62-1.16z" />
+                        </svg>
+                      </div>
+                      <div class="expand-item">
+                        <svg class="icon-chevron" xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                          viewBox="0 0 1024 1024">
+                          <path fill="currentColor"
+                            d="M104.7 685.2a64 64 0 0 0 90.5 0L512 368.4l316.8 316.8a64 64 0 0 0 90.5-90.4l-362-362.1a64 64 0 0 0-90.5 0l-362.1 362a64 64 0 0 0 0 90.5" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="recipe-item">
+                <div class="meal"></div>
+                <div class="meal-details">
+                  <div class="meal-name-tab">
+                    <div class="meal-name">Pizza
+                      <div class="place-of-recipe"><i>American</i></div>
+                    </div>
+                    <div class="meal-actions">
+                      <div class="like-item">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+                          <path fill="currentColor"
+                            d="m8.962 18.91l.464-.588zM12 5.5l-.54.52a.75.75 0 0 0 1.08 0zm3.038 13.41l.465.59zm-5.612-.588C7.91 17.127 6.253 15.96 4.938 14.48C3.65 13.028 2.75 11.335 2.75 9.137h-1.5c0 2.666 1.11 4.7 2.567 6.339c1.43 1.61 3.254 2.9 4.68 4.024zM2.75 9.137c0-2.15 1.215-3.954 2.874-4.713c1.612-.737 3.778-.541 5.836 1.597l1.08-1.04C10.1 2.444 7.264 2.025 5 3.06C2.786 4.073 1.25 6.425 1.25 9.137zM8.497 19.5c.513.404 1.063.834 1.62 1.16s1.193.59 1.883.59v-1.5c-.31 0-.674-.12-1.126-.385c-.453-.264-.922-.628-1.448-1.043zm7.006 0c1.426-1.125 3.25-2.413 4.68-4.024c1.457-1.64 2.567-3.673 2.567-6.339h-1.5c0 2.198-.9 3.891-2.188 5.343c-1.315 1.48-2.972 2.647-4.488 3.842zM22.75 9.137c0-2.712-1.535-5.064-3.75-6.077c-2.264-1.035-5.098-.616-7.54 1.92l1.08 1.04c2.058-2.137 4.224-2.333 5.836-1.596c1.659.759 2.874 2.562 2.874 4.713zm-8.176 9.185c-.526.415-.995.779-1.448 1.043s-.816.385-1.126.385v1.5c.69 0 1.326-.265 1.883-.59c.558-.326 1.107-.756 1.62-1.16z" />
+                        </svg>
+                      </div>
+                      <div class="expand-item">
+                        <svg class="icon-chevron" xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                          viewBox="0 0 1024 1024">
+                          <path fill="currentColor"
+                            d="M104.7 685.2a64 64 0 0 0 90.5 0L512 368.4l316.8 316.8a64 64 0 0 0 90.5-90.4l-362-362.1a64 64 0 0 0-90.5 0l-362.1 362a64 64 0 0 0 0 90.5" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="recipe-item">
+                <div class="meal"></div>
+                <div class="meal-details">
+                  <div class="meal-name-tab">
+                    <div class="meal-name">Rice
+                      <div class="place-of-recipe"><i>Chinese</i></div>
+                    </div>
+                    <div class="meal-actions">
+                      <div class="like-item">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+                          <path fill="currentColor"
+                            d="m8.962 18.91l.464-.588zM12 5.5l-.54.52a.75.75 0 0 0 1.08 0zm3.038 13.41l.465.59zm-5.612-.588C7.91 17.127 6.253 15.96 4.938 14.48C3.65 13.028 2.75 11.335 2.75 9.137h-1.5c0 2.666 1.11 4.7 2.567 6.339c1.43 1.61 3.254 2.9 4.68 4.024zM2.75 9.137c0-2.15 1.215-3.954 2.874-4.713c1.612-.737 3.778-.541 5.836 1.597l1.08-1.04C10.1 2.444 7.264 2.025 5 3.06C2.786 4.073 1.25 6.425 1.25 9.137zM8.497 19.5c.513.404 1.063.834 1.62 1.16s1.193.59 1.883.59v-1.5c-.31 0-.674-.12-1.126-.385c-.453-.264-.922-.628-1.448-1.043zm7.006 0c1.426-1.125 3.25-2.413 4.68-4.024c1.457-1.64 2.567-3.673 2.567-6.339h-1.5c0 2.198-.9 3.891-2.188 5.343c-1.315 1.48-2.972 2.647-4.488 3.842zM22.75 9.137c0-2.712-1.535-5.064-3.75-6.077c-2.264-1.035-5.098-.616-7.54 1.92l1.08 1.04c2.058-2.137 4.224-2.333 5.836-1.596c1.659.759 2.874 2.562 2.874 4.713zm-8.176 9.185c-.526.415-.995.779-1.448 1.043s-.816.385-1.126.385v1.5c.69 0 1.326-.265 1.883-.59c.558-.326 1.107-.756 1.62-1.16z" />
+                        </svg>
+                      </div>
+                      <div class="schedule-item">
+                        <svg xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 640 640"><!--!Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2026 Fonticons, Inc.-->
+                          <path
+                            d="M216 64C229.3 64 240 74.7 240 88L240 128L400 128L400 88C400 74.7 410.7 64 424 64C437.3 64 448 74.7 448 88L448 128L480 128C515.3 128 544 156.7 544 192L544 480C544 515.3 515.3 544 480 544L160 544C124.7 544 96 515.3 96 480L96 192C96 156.7 124.7 128 160 128L192 128L192 88C192 74.7 202.7 64 216 64zM216 176L160 176C151.2 176 144 183.2 144 192L144 240L496 240L496 192C496 183.2 488.8 176 480 176L216 176zM144 288L144 480C144 488.8 151.2 496 160 496L480 496C488.8 496 496 488.8 496 480L496 288L144 288z" />
+                        </svg>
+                      </div>
+                      <div class="expand-item">
+                        <svg class="icon-chevron" xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                          viewBox="0 0 1024 1024">
+                          <path fill="currentColor"
+                            d="M104.7 685.2a64 64 0 0 0 90.5 0L512 368.4l316.8 316.8a64 64 0 0 0 90.5-90.4l-362-362.1a64 64 0 0 0-90.5 0l-362.1 362a64 64 0 0 0 0 90.5" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="meal-more-details">
+                    <div class="recipe-info">
+                      <div class="row">
+                        <div class="recipe-info-item">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+                            <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5">
+                              <path d="M2 12c0 5.523 4.477 10 10 10s10-4.477 10-10S17.523 2 12 2" />
+                              <path stroke-linejoin="round" d="M12 9v4h4" opacity="0.5" />
+                              <circle cx="12" cy="12" r="10" stroke-dasharray=".5 3.5" opacity="0.5" />
+                            </g>
+                          </svg>
+                          <p>24 min</p>
+                        </div>
+                        <div class="recipe-info-item">
+                          <svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" viewBox="0 0 512 512">
+                            <path
+                              d="M224 448s-32 0-32-32 32-128 160-128 160 96 160 128-32 32-32 32zm128-192c53 0 96-43 96-96s-43-96-96-96-96 43-96 96 43 96 96 96M166.9 448c-4.8-10-7.1-20.9-6.9-32 0-43.4 21.8-88 62-119-20.1-6.2-41-9.2-62-9C32 288 0 384 0 416s32 32 32 32zM144 256c44.2 0 80-35.8 80-80s-35.8-80-80-80-80 35.8-80 80 35.8 80 80 80"
+                              style="fill-rule:evenodd;clip-rule:evenodd" />
+                          </svg>
+                          <p>4</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="ingredients-match">
+                      <div class="match-txt">
+                        <p>Match: 6/9</p>
+                        <p>66%</p>
+                      </div>
+                      <div class="ingredients-match-bar">
+                        <div class="ingredients-match-bar-fill"></div>
+                      </div>
+                    </div>
+                    <div class="recipe-ingredients-tab">
+                      <h3>Ingredients</h3>
+                      <div class="ingredient">
+                        <p>Rice (<i>2 cups</i>)</p>
+                        <div class="add-ingredient">
+                          <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"
+                            fill="#1f1f1f">
+                            <path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div class="ingredient">
+                        <p>Tomatoes (<i>2 balls</i>)</p>
+                        <div class="add-ingredient">
+                          <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"
+                            fill="#1f1f1f">
+                            <path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div class="ingredient">
+                        <p>Green pepper (<i> 12 pieces</i>)</p>
+                        <div class="add-ingredient">
+                          <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"
+                            fill="#1f1f1f">
+                            <path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div class="ingredient">
+                        <p>Onion (<i>1 bulb</i>)</p>
+                        <div class="add-ingredient">
+                          <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"
+                            fill="#1f1f1f">
+                            <path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div class="ingredient">
+                        <p>Oil</p>
+                        <div class="add-ingredient">
+                          <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"
+                            fill="#1f1f1f">
+                            <path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div class="ingredient">
+                        <p>Meat (<i>or beef if preferred</i>)</p>
+                        <div class="add-ingredient">
+                          <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"
+                            fill="#1f1f1f">
+                            <path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="nutrients-tab">
+                      <h3>Possible nutrients</h3>
+                      <div class="ingredient">
+                        <div class="nutrient">Vitamins</div>
+                        <div class="nutrient-measure">≈0.28 kal</div>
+                      </div>
+                      <div class="ingredient">
+                        <div class="nutrient">Calories</div>
+                        <div class="nutrient-measure">≈0.22 cal</div>
+                      </div>
+                      <div class="ingredient">
+                        <div class="nutrient">Energy</div>
+                        <div class="nutrient-measure">≈0.19 cal</div>
+                      </div>
+                      <div class="ingredient">
+                        <div class="nutrient">Calcium</div>
+                        <div class="nutrient-measure">≈0.34 kal</div>
+                      </div>
+                    </div>
+                    <button id="prepareRecipeButton"><i>Prepare</i></button>
+                    <div class="recipe-source-credits">
+                      <p><i>credits to: PlanUp.co</i></p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+    `;
+
+    detailsContainer.appendChild(itemDetailsSection);
+  }
+
+  seeRecipesBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    // Show insights page and render details at bottom
+    const item = items.find(
+      (it) =>
+        String(it.id) === String(itemId) ||
+        (it.name && it.name.trim() === name),
+    );
+    if (document.getElementById("navInsights"))
+      document.getElementById("navInsights").click();
+    setTimeout(() => {
+      // if (item) showItemDetails(item);
+      if (item) createItemDetailsSection(item);
+      else showItemDetails({ name });
+    }, 120);
+    closeModal();
+  });
+
+  editBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    // Prefill add item modal and open for edit
+    const item = items.find(
+      (it) =>
+        String(it.id) === String(itemId) ||
+        (it.name && it.name.trim() === name),
+    );
+    if (item) {
+      editingInventoryItemId = item.id;
+      populateFormFromItem(item);
+      openAddItemModal();
+    }
+    closeModal();
+  });
+
+  remindBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const item = items.find(
+      (it) =>
+        String(it.id) === String(itemId) ||
+        (it.name && it.name.trim() === name),
+    );
+    openReminderModal(item || { name });
+    closeModal();
+  });
+
+  // click outside closes
+  setTimeout(() => {
+    document.addEventListener("click", function _c(e) {
+      if (!modal.contains(e.target)) {
+        modal.style.display = "none";
+        document.removeEventListener("click", _c);
+      }
+    });
+  }, 20);
+}
+
+// delegate clicks for options button
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest(".item-options-btn");
+  if (!btn) return;
+  e.stopPropagation();
+  const section = btn.closest(".item-card-sec");
+  if (!section) return;
+  const rect = btn.getBoundingClientRect();
+  openItemOptionsModal(section, rect);
+});
 
 function updateConcurrentAddButtonLabel() {
   if (!concurrentAddBtn) return;
@@ -4702,14 +5328,14 @@ function addInventoryItem(item, { silent = false } = {}) {
 
   const existingItemSection = categoryCard
     ? Array.from(categoryCard.querySelectorAll(".item-card-sec")).find(
-      (section) => {
-        const itemTitle = section.querySelector(".item-name");
-        return (
-          itemTitle &&
-          itemTitle.textContent.trim().toLowerCase() === normalizedName
-        );
-      },
-    )
+        (section) => {
+          const itemTitle = section.querySelector(".item-name");
+          return (
+            itemTitle &&
+            itemTitle.textContent.trim().toLowerCase() === normalizedName
+          );
+        },
+      )
     : null;
 
   let updatedQuantity = quantity;
@@ -4737,10 +5363,12 @@ function addInventoryItem(item, { silent = false } = {}) {
     updateCardInfoState(existingItemSection, 0);
   }
 
+  const itemId = existingDataItem ? existingDataItem.id : Date.now();
+
   if (!existingItemSection) {
     if (categoryCard) {
       categoryCard.appendChild(
-        createItemCardSection(itemName, updatedQuantity, updatedPrice),
+        createItemCardSection(itemName, updatedQuantity, updatedPrice, itemId),
       );
     } else if (cardContainer) {
       const newCategoryCard = document.createElement("div");
@@ -4751,6 +5379,7 @@ function addInventoryItem(item, { silent = false } = {}) {
           itemName,
           updatedQuantity,
           updatedPrice,
+          itemId,
         ),
       );
       cardContainer.appendChild(newCategoryCard);
@@ -4759,13 +5388,13 @@ function addInventoryItem(item, { silent = false } = {}) {
 
   if (!existingDataItem) {
     items.push({
-      id: Date.now(),
+      id: itemId,
       name: itemName,
       category,
       quantity: updatedQuantity,
       price: updatedPrice,
       timestamp: new Date().toISOString(),
-      createdAt: new Date(),
+      createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
   }
@@ -4780,37 +5409,238 @@ function addInventoryItem(item, { silent = false } = {}) {
   return true;
 }
 
+function renderSavedItems() {
+  const cardContainer = document.querySelector(".card-container");
+  if (!cardContainer) return;
+
+  cardContainer.innerHTML = "";
+  const categoryMap = new Map();
+
+  items.forEach((item) => {
+    const category = item.category || suggestSmartCategory(item.name);
+    const key = category.toLowerCase();
+
+    if (!categoryMap.has(key)) {
+      const categoryCard = document.createElement("div");
+      categoryCard.className = "category-card";
+      categoryCard.innerHTML = `
+        <div class="card-header">
+          <div class="category-name"></div>
+          ${category}
+          <div class="category-card-sort-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 48 48">
+              <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M19 6v36M7 17.9l12-12m10 36.2v-36m0 36l12-12"/>
+            </svg>
+          </div>
+        </div>
+      `;
+      categoryMap.set(key, categoryCard);
+    }
+
+    const categoryCard = categoryMap.get(key);
+    const itemSection = createItemCardSection(
+      item.name,
+      item.quantity,
+      item.price,
+      item.id,
+    );
+    categoryCard.appendChild(itemSection);
+  });
+
+  categoryMap.forEach((card) => cardContainer.appendChild(card));
+
+  updateCategoryEmptyState();
+  updateFilterBar();
+  filterCategories(activeFilter);
+  initializeCardExpansion();
+  initializeImageModals();
+  initializeInfoListeners();
+}
+
 // Smart Category Suggestion (Improved)
 function suggestSmartCategory(itemName) {
   const name = itemName.toLowerCase().trim();
 
   const rules = {
     Vegetables: [
+      "pepper",
       "lettuce",
       "carrot",
       "broccoli",
       "spinach",
+      "kale",
       "cabbage",
-      "tomato",
+      "potato",
       "onion",
-      "pepper",
+      "garlic",
+      "tomato",
       "cucumber",
+      "bell pepper",
+      "zucchini",
+      "asparagus",
+      "beans",
+      "peas",
+      "corn",
+      "eggplant",
+      "celery",
+      "radish",
+      "green beans",
     ],
     Fruits: [
       "apple",
       "banana",
       "orange",
-      "mango",
-      "strawberry",
       "grape",
+      "strawberry",
+      "blueberry",
+      "raspberry",
+      "blackberry",
+      "watermelon",
+      "mango",
       "pineapple",
+      "peach",
+      "pear",
+      "cherry",
+      "lime",
+      "lemon",
+      "kiwi",
+      "coconut",
+      "papaya",
+      "avocado",
     ],
-    Meat: ["chicken", "beef", "pork", "fish", "salmon", "steak", "turkey"],
-    Dairy: ["milk", "cheese", "yogurt", "butter", "cream"],
-    Grains: ["rice", "bread", "pasta", "oats", "cereal"],
-    Snacks: ["chips", "cookies", "chocolate", "nuts", "candy"],
-    Beverages: ["water", "juice", "soda", "coffee", "tea"],
-    Spices: ["salt", "pepper", "spice", "sauce", "oil"],
+    Protein: [
+      "fish",
+      "salmon",
+      "cod",
+      "tuna",
+      "shrimp",
+      "egg",
+      "tofu",
+      "tempeh",
+      "lentils",
+      "chickpeas",
+      "nuts",
+      "almonds",
+      "peanuts",
+    ],
+    Legumes: ["beans"],
+    Meat: [
+      "chicken",
+      "beef",
+      "pork",
+      "lamb",
+      "turkey",
+      "steak",
+      "ribs",
+      "ham",
+      "sausage",
+      "meatball",
+    ],
+    Dairy: [
+      "milk",
+      "cheese",
+      "yogurt",
+      "butter",
+      "cream",
+      "ice cream",
+      "mozzarella",
+      "cheddar",
+      "feta",
+      "parmesan",
+    ],
+    Grains: [
+      "bread",
+      "rice",
+      "pasta",
+      "cereal",
+      "oats",
+      "wheat",
+      "barley",
+      "flour",
+      "noodles",
+      "quinoa",
+    ],
+    Snacks: [
+      "chips",
+      "crackers",
+      "popcorn",
+      "candy",
+      "chocolate",
+      "cookies",
+      "granola",
+      "nuts",
+      "dried fruit",
+    ],
+    Beverages: [
+      "juice",
+      "soda",
+      "coffee",
+      "tea",
+      "water",
+      "milk",
+      "beer",
+      "wine",
+      "whiskey",
+      "vodka",
+    ],
+    Spices: [
+      "salt",
+      "spice",
+      "spices",
+      "sauce",
+      "oil",
+      "pepper",
+      "cinnamon",
+      "paprika",
+      "cumin",
+      "oregano",
+      "basil",
+      "thyme",
+      "ginger",
+      "turmeric",
+    ],
+    Salad: ["salad", "slaw", "coleslaw", "greens"],
+    Pudding: [
+      "pudding",
+      "mousse",
+      "dessert",
+      "tiramisu",
+      "cheesecake",
+      "brownie",
+    ],
+    Seafood: [
+      "fish",
+      "salmon",
+      "tuna",
+      "shrimp",
+      "crab",
+      "lobster",
+      "squid",
+      "oyster",
+      "seafood",
+    ],
+    Pasta: ["pasta", "spaghetti", "lasagna", "noodle", "ravioli"],
+    Soup: ["soup", "broth", "stew", "chowder", "bisque"],
+    Vegetarian: [
+      "tofu",
+      "vegetable",
+      "veggie",
+      "vegan",
+      "greens",
+      "spinach",
+      "kale",
+    ],
+    Pastry: [
+      "cake",
+      "pie",
+      "tart",
+      "croissant",
+      "donut",
+      "pastry",
+      "bread",
+      "biscuit",
+      "cookie",
+    ],
   };
 
   for (const [category, keywords] of Object.entries(rules)) {
@@ -4831,7 +5661,9 @@ if (saveItemBtn) {
       if (concurrentItemsList.length > 0) {
         if (hasCurrentFormData) {
           if (!hasCurrentValidItem) {
-            showToast("Please complete the form before saving concurrent items.");
+            showToast(
+              "Please complete the form before saving concurrent items.",
+            );
             return;
           }
           addToConcurrentList();
@@ -4876,17 +5708,46 @@ if (saveItemBtn) {
 
       // Safely invoke update/refresh functions so errors don't abort the save flow
       try {
-        if (typeof updateFilterSortVisibility === "function") updateFilterSortVisibility();
+        if (typeof updateFilterSortVisibility === "function")
+          updateFilterSortVisibility();
       } catch (e) {
         console.warn("updateFilterSortVisibility failed", e);
       }
-      try { updateBudgetProgress(); } catch (e) { console.warn("updateBudgetProgress failed", e); }
-      try { updateCategoryEmptyState(); } catch (e) { console.warn("updateCategoryEmptyState failed", e); }
-      try { updateGlobalEmptyState(); } catch (e) { console.warn("updateGlobalEmptyState failed", e); }
-      try { updateFilterBar(); } catch (e) { console.warn("updateFilterBar failed", e); }
-      try { filterCategories(activeFilter); } catch (e) { console.warn("filterCategories failed", e); }
-      try { renderInsightsChart(); } catch (e) { console.warn("renderInsightsChart failed", e); }
-      try { updateInsightsPage(); } catch (e) { console.warn("updateInsightsPage failed", e); }
+      try {
+        updateBudgetProgress();
+      } catch (e) {
+        console.warn("updateBudgetProgress failed", e);
+      }
+      try {
+        updateCategoryEmptyState();
+      } catch (e) {
+        console.warn("updateCategoryEmptyState failed", e);
+      }
+      try {
+        updateGlobalEmptyState();
+      } catch (e) {
+        console.warn("updateGlobalEmptyState failed", e);
+      }
+      try {
+        updateFilterBar();
+      } catch (e) {
+        console.warn("updateFilterBar failed", e);
+      }
+      try {
+        filterCategories(activeFilter);
+      } catch (e) {
+        console.warn("filterCategories failed", e);
+      }
+      try {
+        renderInsightsChart();
+      } catch (e) {
+        console.warn("renderInsightsChart failed", e);
+      }
+      try {
+        updateInsightsPage();
+      } catch (e) {
+        console.warn("updateInsightsPage failed", e);
+      }
 
       setTimeout(() => {
         initializeSwipe();
@@ -4968,29 +5829,9 @@ function updateBudgetProgress() {
   filteredItems.forEach((item) => {
     const price = parseFloat(item.price) || 0;
     const qty = parseInt(item.quantity) || 1;
-    totalSpent += price * qty;
+    totalSpent += price; // item.price already stores the total cost for this line
     totalItems += qty;
   });
-
-  /* infoBlock.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      infoBlock.click();
-    }
-  }); */
-
-  let setBudget = [];
-
-  function setBudgetValue() {
-    const budgetInput = document.getElementById("budgetInput");
-    budgetInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        budgetInput = budgetInput.value;
-      }
-    });
-    setBudget.push(budgetInput);
-    return budgetInput;
-  }
 
   const budgetAmount = parseFloat(budget) || 0;
   const remaining = budgetAmount - totalSpent;
@@ -5033,7 +5874,9 @@ function updateBudgetProgress() {
       percentage >= alertAtBudget &&
       !window.__budgetAlertNotified
     ) {
-      showBudgetNotification(`You've used ${Math.round(percentage)}% of your budget`);
+      showBudgetNotification(
+        `You've used ${Math.round(percentage)}% of your budget`,
+      );
       window.__budgetAlertNotified = true;
     }
   } else {
@@ -5043,7 +5886,9 @@ function updateBudgetProgress() {
     if (remainingLabel) remainingLabel.textContent = "Over budget";
 
     if (budgetAlertsEnabled && !window.__budgetAlertNotified) {
-      showBudgetNotification(`You've used ${Math.round(percentage)}% of your budget`);
+      showBudgetNotification(
+        `You've used ${Math.round(percentage)}% of your budget`,
+      );
       window.__budgetAlertNotified = true;
     }
   }
@@ -5084,12 +5929,13 @@ function showNotification(options) {
     icon = null,
     sound = "metal",
     autoHide = true,
+    delay = 0,
     onClick = null,
   } = options;
 
   if (!notificationBar || !notificationBtn || !searchBar) return;
 
-  // Delay notification appearance by 2 seconds
+  // Delay notification appearance by the configured delay
   setTimeout(() => {
     // Update notification message
     notificationMessage.textContent = message;
@@ -5240,6 +6086,7 @@ function playNotificationSound(type = "metal") {
   }
 }
 
+renderSavedItems();
 updateBudgetProgress();
 updateCategoryEmptyState();
 updateGlobalEmptyState();
@@ -5349,6 +6196,59 @@ function initializeImageModals() {
     });
   });
 }
+
+// On desktop: when any full-page would be shown, replace the insights pane
+function initDesktopInsightsReplacement() {
+  const fullPages = document.querySelectorAll(".full-page");
+  const insightsPane = document.querySelector(".insights-page");
+  if (!insightsPane || fullPages.length === 0) return;
+
+  function updateReplacement() {
+    if (window.innerWidth < 1100) {
+      // mobile: normal behavior
+      insightsPane.classList.remove("replaced");
+      return;
+    }
+
+    // find a full-page that is visible (has .show or is not hidden)
+    const visible = Array.from(fullPages).find((p) =>
+      p.classList.contains("show"),
+    );
+    if (visible) {
+      // move or clone the visible page into insights pane area
+      if (!insightsPane.dataset.original)
+        insightsPane.dataset.original = insightsPane.innerHTML;
+      insightsPane.innerHTML = visible.innerHTML;
+      insightsPane.classList.add("replaced");
+    } else {
+      // restore original insights content
+      if (insightsPane.dataset.original) {
+        insightsPane.innerHTML = insightsPane.dataset.original;
+        delete insightsPane.dataset.original;
+      }
+      insightsPane.classList.remove("replaced");
+    }
+  }
+
+  // observe class changes on fullPages
+  const observer = new MutationObserver((mutations) => {
+    for (const m of mutations) {
+      if (m.type === "attributes" && m.attributeName === "class") {
+        updateReplacement();
+        break;
+      }
+    }
+  });
+
+  fullPages.forEach((p) =>
+    observer.observe(p, { attributes: true, attributeFilter: ["class"] }),
+  );
+  window.addEventListener("resize", updateReplacement);
+  // initial
+  updateReplacement();
+}
+
+initDesktopInsightsReplacement();
 
 // SWIPE TO DELETE/DONE
 function initializeSwipe() {
@@ -5701,16 +6601,22 @@ window.addEventListener("DOMContentLoaded", () => {
       tg?.classList.remove("on");
       ground?.classList.remove("on");
     }
-    budgetTogglerEl.querySelector(".click-listener")?.addEventListener("click", () => {
-      budgetAlertsEnabled = !budgetAlertsEnabled;
-      localStorage.setItem(BUDGET_ALERTS_ENABLED_KEY, budgetAlertsEnabled ? "true" : "false");
-      showToast(`Budget alerts ${budgetAlertsEnabled ? "enabled" : "disabled"}`);
-    });
+    budgetTogglerEl
+      .querySelector(".click-listener")
+      ?.addEventListener("click", () => {
+        budgetAlertsEnabled = !budgetAlertsEnabled;
+        localStorage.setItem(
+          BUDGET_ALERTS_ENABLED_KEY,
+          budgetAlertsEnabled ? "true" : "false",
+        );
+        showToast(
+          `Budget alerts ${budgetAlertsEnabled ? "enabled" : "disabled"}`,
+        );
+      });
   }
 
   // Ensure bell not animating on load
   if (notificationBtn) notificationBtn.classList.remove("shake");
-
 });
 
 // ===== PROFILE PAGE SCROLL EFFECT =====
@@ -5917,6 +6823,15 @@ document
     }
   });
 
+//===== REMINDER PAGE =====
+const reminderBtn = document.getElementById("reminderBtn");
+const reminderPage = document.getElementById("reminderPage");
+
+reminderBtn.addEventListener("click", () => {
+  reminderPage.classList.add("show");
+  console.log("Reminder page should be opened");
+});
+
 // ===== DASHBOARD FUNCTIONALITY =====
 function showDashboard() {
   const dashboardPage = document.getElementById("dashboardPage");
@@ -6036,43 +6951,26 @@ function updateCategoryBreakdown() {
 function updateRecentItems() {
   const container = document.getElementById("recentItemsContainer");
   container.innerHTML = "";
-
-  // Get items from DOM (newest first)
-  const itemCards = document.querySelectorAll(".item-card-sec");
-  const recentItems = [];
-
-  itemCards.forEach((card) => {
-    const nameEl = card.querySelector(".item-name");
-    const priceEl = card.querySelector(".item-price");
-    const categoryCard = card.closest(".category-card");
-    const categoryHeader = categoryCard?.querySelector(".card-header");
-    const categoryName = getCategoryNameFromHeader(categoryHeader);
-
-    if (nameEl && priceEl) {
-      const price = parseFloat(priceEl.textContent.replace("$", "").trim());
-      if (!isNaN(price)) {
-        recentItems.push({
-          name: nameEl.textContent.trim(),
-          price: price,
-          category: categoryName,
-        });
-      }
-    }
-  });
-
-  if (recentItems.length === 0) {
+  // Use stored items and their timestamps for accurate recent list
+  if (!items || items.length === 0) {
     container.innerHTML = `<p style="text-align: center; color: #999;">No items yet</p>`;
     return;
   }
 
-  // Show last 5 items
-  recentItems.slice(0, 5).forEach((item) => {
+  const recent = items
+    .slice()
+    .sort((a, b) => new Date(b.createdAt || b.timestamp || b.updatedAt) - new Date(a.createdAt || a.timestamp || a.updatedAt))
+    .slice(0, 5);
+
+  recent.forEach((it) => {
     const itemDiv = document.createElement("div");
     itemDiv.className = "recent-item";
+    const when = new Date(it.createdAt || it.timestamp || Date.now()).toLocaleDateString();
     itemDiv.innerHTML = `
-      <span class="recent-item-name">${item.name}</span>
-      <span class="recent-item-price">$${item.price.toFixed(2)}</span>
-      <span class="recent-item-category">${item.category}</span>
+      <span class="recent-item-name">${it.name || "?"}</span>
+      <span class="recent-item-price">$${(parseFloat(it.price) || 0).toFixed(2)}</span>
+      <span class="recent-item-category">${it.category || ""}</span>
+      <span class="recent-item-time">${when}</span>
     `;
     container.appendChild(itemDiv);
   });
