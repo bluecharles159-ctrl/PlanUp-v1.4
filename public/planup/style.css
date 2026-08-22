@@ -2677,11 +2677,14 @@ input[type="number"]::-webkit-outer-spin-button {
 .insights-content {
   width: 100%;
   height: 100%;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  /*overflow-y: auto;*/
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .display-tab {
@@ -3941,6 +3944,7 @@ input[type="number"]::-webkit-outer-spin-button {
   justify-content: flex-start;
   flex-shrink: 0;
   padding: 20px;
+  overflow-x: none;
 }
 
 /* DARK OVERLAY FOR READABLE TEXT */
@@ -3972,6 +3976,7 @@ input[type="number"]::-webkit-outer-spin-button {
   inset: 0;
   margin-top: 50px;
   overflow-y: auto;
+  overflow-x: none;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
   scrollbar-width: none;
@@ -6882,4 +6887,145 @@ body.theme-dark .bug-report-send {
 body.theme-dark .app-picker-option:hover,
 body.theme-dark .app-picker-option.selected {
   background: #333;
+}
+
+/* Auto-derived: every surface across the app that still carried a
+   light/white background, swept up and darkened so nothing white
+   leaks through in dark mode. Opaque surfaces go to the same dark
+   card color used elsewhere; surfaces that were translucent (glass
+   panels, blur overlays) get a subtle light-on-dark tint instead so
+   the frosted-glass effect still reads correctly against a dark body. */
+body.theme-dark .search-bar,
+body.theme-dark .notification-bar.show,
+body.theme-dark .notification-bar.expand,
+body.theme-dark .notification-bar:hover,
+body.theme-dark .budget-card,
+body.theme-dark .budget-card.warning,
+body.theme-dark .budget-card.over,
+body.theme-dark .filter-bar,
+body.theme-dark .filter-chip,
+body.theme-dark .category-card,
+body.theme-dark .item-card,
+body.theme-dark .history-item,
+body.theme-dark .image-modal-btn,
+body.theme-dark .image-modal-btn:hover,
+body.theme-dark .item-card.swipeable,
+body.theme-dark .fab-camera:active,
+body.theme-dark .fab-camera:hover,
+body.theme-dark .fab:hover,
+body.theme-dark .fab-item,
+body.theme-dark .fab-item:hover,
+body.theme-dark .center-confirm,
+body.theme-dark .center-confirm-btn,
+body.theme-dark .concurrent-items-container:active,
+body.theme-dark .concurrent-items-container.expand,
+body.theme-dark .concurrent-items-container:hover .concurrent-items-wrapper,
+body.theme-dark .full-page-header,
+body.theme-dark .notification-page,
+body.theme-dark .notification-item,
+body.theme-dark .empty-page-card,
+body.theme-dark .nav-page-header,
+body.theme-dark .display-card,
+body.theme-dark .overview-bg-card,
+body.theme-dark .overview-card,
+body.theme-dark .overview-divider,
+body.theme-dark .range-option:hover,
+body.theme-dark .range-option:active,
+body.theme-dark .range-modal div:hover,
+body.theme-dark .cat-amt-container.bg,
+body.theme-dark .breakdown-by-price-btn,
+body.theme-dark .breakdown-by-price-btn.expanded,
+body.theme-dark .recipe-frequency-chart-wrapper,
+body.theme-dark .doughnut-chart-filler,
+body.theme-dark .make-recipe-page,
+body.theme-dark .profile-foreground,
+body.theme-dark .profile-avatar,
+body.theme-dark .acc-wrapper,
+body.theme-dark .at-place-btn,
+body.theme-dark .at-place-modal,
+body.theme-dark .profile-card,
+body.theme-dark .export-action,
+body.theme-dark .export-action:active,
+body.theme-dark .delete-action,
+body.theme-dark .p-element-input,
+body.theme-dark .element-footer span:active,
+body.theme-dark .currency-selector-div,
+body.theme-dark .currency-div-select:active,
+body.theme-dark .feedback-box,
+body.theme-dark .faqs-box,
+body.theme-dark .faq-n-ans,
+body.theme-dark .faq-n-ans:hover,
+body.theme-dark .icon:hover,
+body.theme-dark .faq-n-ans.expand,
+body.theme-dark .add-to-get-modal,
+body.theme-dark .to-get-item-card,
+body.theme-dark .to-get-item-modal,
+body.theme-dark .to-get-item-modal-option:hover,
+body.theme-dark .fav-filter-sect,
+body.theme-dark .fav-filter-wrapper,
+body.theme-dark .fav-filter-container,
+body.theme-dark .fav-recipe-item,
+body.theme-dark .fav-recipe-item:hover,
+body.theme-dark .settings-card,
+body.theme-dark .settings-value,
+body.theme-dark #feedbackInput,
+body.theme-dark .feedback-sec input,
+body.theme-dark .recipe-search-bar,
+body.theme-dark .recipe-head-bar,
+body.theme-dark .trending-card,
+body.theme-dark .recipe-card,
+body.theme-dark .match-bar,
+body.theme-dark .recipe-details,
+body.theme-dark .ingredients-section,
+body.theme-dark .missing-items-section,
+body.theme-dark .dashboard-card,
+body.theme-dark .dashboard-stat,
+body.theme-dark .category-bar-container,
+body.theme-dark .recent-item,
+body.theme-dark .recent-item-category,
+body.theme-dark .stat-box,
+body.theme-dark .admin-event-row,
+body.theme-dark .settings-page .full-page-content,
+body.theme-dark .settings-user-card,
+body.theme-dark .settings-section,
+body.theme-dark .settings-item:active,
+body.theme-dark .setting-icon,
+body.theme-dark .profile-action-btn.secondary,
+body.theme-dark .profile-action-btn.secondary:active,
+body.theme-dark .upgrade-btn,
+body.theme-dark .profile-section,
+body.theme-dark .activity-item,
+body.theme-dark .activity-icon,
+body.theme-dark .bug-report-input,
+body.theme-dark .app-picker {
+  background: #1c1c1c;
+}
+
+body.theme-dark .menu-item:hover,
+body.theme-dark .sort-modal,
+body.theme-dark .img,
+body.theme-dark .store-purchased-from,
+body.theme-dark .store-info,
+body.theme-dark .time-item-added,
+body.theme-dark .item-image-card,
+body.theme-dark .source-badge,
+body.theme-dark .info-line,
+body.theme-dark .concurrent-items-wrapper,
+body.theme-dark .btn-cancel:hover,
+body.theme-dark .modal-btn-borderground,
+body.theme-dark .range-modal,
+body.theme-dark .chart-card canvas,
+body.theme-dark .chart-table,
+body.theme-dark .item-details,
+body.theme-dark .item-details-blur-ground,
+body.theme-dark .price-insights-details,
+body.theme-dark .recipe-item,
+body.theme-dark .header-toggle,
+body.theme-dark .account-toggle,
+body.theme-dark .p-header svg,
+body.theme-dark .delete-panel,
+body.theme-dark .icon,
+body.theme-dark .faq-ans,
+body.theme-dark .show-more:hover {
+  background: rgba(255, 255, 255, 0.06);
 }

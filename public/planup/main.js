@@ -739,301 +739,125 @@ document.addEventListener("click", (e) => {
 updatePeriodOptionText();
 if (rangeText) rangeText.textContent = selectedRange;
 
-// ====================== DATE RANGE FILTERING LOGIC ======================
+// ====================== REAL-CALENDAR WEEK/MONTH CONTAINERS ======================
+// Weeks are real calendar weeks (Sunday - Saturday), not arbitrary 7-day
+// chunks counted back from "now". If the app is first used mid-week, that
+// week's container still spans the full Sun-Sat range - the days before
+// first use simply have zero data, they aren't shifted or skipped.
+//
+// Once a week is fully over, its stats (expenditure, items added, avg per
+// item, top category) are locked in and saved to localStorage as a
+// "container". This means insights stay accurate even if items are later
+// marked used/deleted - the week's numbers were already saved at the time
+// it closed. The current, still-in-progress week is always computed live.
+//
+// Months are built from real calendar month boundaries by checking which
+// saved week containers fall inside them (a week "belongs" to the month
+// its Sunday lands in) - so "2 weeks" is genuinely two saved weeks added
+// together, and a month view is genuinely the weeks that occurred in it.
 
-// Get start timestamp based on period and range
-function getRangeStart(period, range) {
-  const now = new Date();
-  const start = new Date(now);
+const MS_DAY = 24 * 60 * 60 * 1000;
+const WEEKLY_CONTAINERS_KEY = "planup_weekly_containers";
 
-  if (period === "week") {
-    switch (range) {
-      case "This week":
-        start.setDate(now.getDate() - 7);
-        break;
-      case "Last week":
-        start.setDate(now.getDate() - 14);
-        break;
-      case "Last 2 weeks":
-        start.setDate(now.getDate() - 21);
-        break;
-      case "Last 3 weeks":
-        start.setDate(now.getDate() - 28);
-        break;
-      default:
-        start.setDate(now.getDate() - 7);
-    }
-  } else if (period === "month") {
-    switch (range) {
-      case "This month":
-        start.setMonth(now.getMonth() - 1);
-        break;
-      case "Last month":
-        start.setMonth(now.getMonth() - 2);
-        break;
-      case "Last 2 months":
-        start.setMonth(now.getMonth() - 3);
-        break;
-      case "Last 3 months":
-        start.setMonth(now.getMonth() - 4);
-        break;
-      default:
-        start.setMonth(now.getMonth() - 1);
-    }
-  }
-
-  // Reset to start of day
-  start.setHours(0, 0, 0, 0);
-  return start.getTime();
+function startOfDay(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
 }
 
-// Get end timestamp (usually now)
-function getRangeEnd() {
-  return Date.now();
+// Real-world week start = Sunday.
+function getWeekStart(date) {
+  const d = startOfDay(date);
+  d.setDate(d.getDate() - d.getDay());
+  return d;
 }
 
-// Filter items based on current period + range
-// ====================== DATE RANGE + INSIGHTS LOGIC ======================
-
-// Get filtered items based on current period and range
-function getFilteredItems() {
-  if (!items || items.length === 0) return [];
-
-  const startTime = getRangeStart(currentPeriod, selectedRange);
-  const endTime = Date.now();
-
-  return items.filter((item) => {
-    const itemTime = new Date(
-      item.createdAt || item.timestamp || item.updatedAt || Date.now(),
-    ).getTime();
-    return itemTime >= startTime && itemTime <= endTime;
-  });
+function getWeekEnd(date) {
+  const s = getWeekStart(date);
+  const e = new Date(s);
+  e.setDate(e.getDate() + 6);
+  e.setHours(23, 59, 59, 999);
+  return e;
 }
 
-// Group items into week buckets between a start and end timestamp
-function groupItemsByWeeks(items, startTime, endTime) {
-  const weekMs = 7 * 24 * 60 * 60 * 1000;
-  const groups = [];
-  const start = new Date(startTime);
-  start.setHours(0, 0, 0, 0);
-  const totalWeeks = Math.max(1, Math.ceil((endTime - start.getTime()) / weekMs));
-
-  for (let i = 0; i < totalWeeks; i++) {
-    const s = new Date(start.getTime() + i * weekMs);
-    const e = new Date(s.getTime() + weekMs - 1);
-    const weekItems = items.filter((it) => {
-      const t = new Date(it.createdAt || it.timestamp || it.updatedAt || Date.now()).getTime();
-      return t >= s.getTime() && t <= e.getTime();
-    });
-    groups.push({
-      weekStart: s,
-      weekEnd: e,
-      items: weekItems,
-      total: weekItems.reduce((sum, it) => sum + (parseFloat(it.price) || 0), 0),
-    });
-  }
-
-  return groups;
+function getMonthStart(date) {
+  const d = new Date(date.getFullYear(), date.getMonth(), 1);
+  d.setHours(0, 0, 0, 0);
+  return d;
 }
 
-// Group consecutive weeks into months (simple grouping by month of weekStart)
-function groupWeeksByMonth(weekGroups) {
-  const months = {};
-  weekGroups.forEach((w) => {
-    const key = `${w.weekStart.getFullYear()}-${w.weekStart.getMonth() + 1}`;
-    months[key] = months[key] || { month: w.weekStart.getMonth(), year: w.weekStart.getFullYear(), weeks: [], total: 0 };
-    months[key].weeks.push(w);
-    months[key].total += w.total;
-  });
-  return Object.values(months);
+function getMonthEnd(date) {
+  const d = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  d.setHours(23, 59, 59, 999);
+  return d;
 }
 
-// Main function to update all insights metrics
-/* function updateInsightsPage() {
-  const filteredItems = getFilteredItems();
+function weekKey(date) {
+  const s = getWeekStart(date);
+  return `${s.getFullYear()}-${String(s.getMonth() + 1).padStart(2, "0")}-${String(s.getDate()).padStart(2, "0")}`;
+}
 
-  let totalSpent = 0;
-  let totalItemsCount = 0;
-  const categoryStats = {};
-
-  filteredItems.forEach(item => {
-    const price = parseFloat(item.price) || 0;
-    const qty = parseInt(item.quantity) || 1;
-    
-    totalSpent += price;
-    totalItemsCount += qty;
-
-    const cat = (item.category || "Other").trim();
-    if (!categoryStats[cat]) {
-      categoryStats[cat] = { totalPrice: 0, totalQty: 0 };
-    }
-    categoryStats[cat].totalPrice += price;
-    categoryStats[cat].totalQty += qty;
-  });
-
-  // Update Overview Cards
-  document.getElementById("overviewTotalSpent").textContent = `$${totalSpent.toFixed(2)}`;
-  document.getElementById("overviewTotalItems").textContent = totalItemsCount;
-
-  // Budget Used
-  const budgetUsedPercent = budget > 0 ? Math.min(100, Math.round((totalSpent / budget) * 100)) : 0;
-  document.getElementById("overviewTotalBudget").textContent = `${budgetUsedPercent}%`;
-
-  // Top Category
-  let topCategory = "None";
-  let maxSpent = 0;
-  Object.keys(categoryStats).forEach(cat => {
-    if (categoryStats[cat].totalPrice > maxSpent) {
-      maxSpent = categoryStats[cat].totalPrice;
-      topCategory = cat;
-    }
-  });
-  document.getElementById("overviewTopCategory").textContent = topCategory;
-
-  // Update Category Breakdown
-  updateCategoryBreakdown(categoryStats, totalSpent);
-} */
-
-// Category Breakdown - Top by Price & Qty
-function updateCategoryBreakdown(categoryStats, totalOverallSpent) {
-  const container = document.getElementById("categoryBreakdownContainer");
-  if (!container) return;
-  container.innerHTML = "";
-
-  const statsArray = Object.entries(categoryStats).map(([name, data]) => ({
-    name,
-    totalPrice: data.totalPrice,
-    totalQty: data.totalQty,
+// The full "items added" timeline, surviving deletion/use. Live items
+// (still in the inventory) come from `items`; items later marked used or
+// deleted come from the history log, which preserves their original
+// createdAt so they still count toward the week they were actually added
+// in, not the week they were removed.
+function getAllTrackedEvents() {
+  const fromItems = (items || []).map((it) => ({
+    createdAt: it.createdAt || it.timestamp || it.updatedAt || new Date().toISOString(),
+    price: parseFloat(it.price) || 0,
+    quantity: parseInt(it.quantity) || 1,
+    category: (it.category || "Other").toString().trim() || "Other",
+    name: it.name || "Unknown",
   }));
 
-  // Top 3 by Spending
-  const topByPrice = [...statsArray]
-    .sort((a, b) => b.totalPrice - a.totalPrice)
-    .slice(0, 3);
+  const fromHistory = loadHistory()
+    .filter((h) => h.action === "used" || h.action === "deleted")
+    .map((h) => ({
+      createdAt: h.createdAt || h.time || new Date().toISOString(),
+      price: parseFloat(h.price) || 0,
+      quantity: parseInt(h.quantity) || 1,
+      category: (h.category || "Other").toString().trim() || "Other",
+      name: h.name || "Unknown",
+    }));
 
-  if (topByPrice.length > 0) {
-    const header = document.createElement("h4");
-    header.textContent = "Top Spending Categories";
-    header.style.margin = "12px 0 8px";
-    container.appendChild(header);
+  return fromItems.concat(fromHistory);
+}
 
-    topByPrice.forEach((cat) => {
-      const percentage =
-        totalOverallSpent > 0 ? (cat.totalPrice / totalOverallSpent) * 100 : 0;
-      const div = document.createElement("div");
-      div.className = "category-breakdown-item";
-      div.innerHTML = `
-        <div class="category-name">${cat.name}</div>
-        <div class="category-stats">
-          <span>Qty: ${cat.totalQty}</span>
-          <span>$${cat.totalPrice.toFixed(2)}</span>
-        </div>
-        <div class="category-bar-container">
-          <div class="category-bar-fill" style="width: ${percentage}%"></div>
-        </div>
-        <span class="percentage">${percentage.toFixed(0)}%</span>
-      `;
-      container.appendChild(div);
-    });
-  }
-
-  if (statsArray.length === 0) {
-    container.innerHTML = `<p style="text-align:center;color:#999;padding:30px 0;">No items in current range</p>`;
+function loadWeeklyContainers() {
+  try {
+    const stored = localStorage.getItem(WEEKLY_CONTAINERS_KEY);
+    return stored ? JSON.parse(stored) : {};
+  } catch (e) {
+    return {};
   }
 }
 
-// ====================== INSIGHTS PAGE - REAL DATA ======================
-/* function updateInsightsPage() {
-  const filteredItems = getFilteredItems();
+function saveWeeklyContainers(containers) {
+  localStorage.setItem(WEEKLY_CONTAINERS_KEY, JSON.stringify(containers));
+}
 
-  let totalSpent = 0;
-  let totalItemsCount = 0;
+function computeWeekStats(weekStartDate, events) {
+  const weekStart = getWeekStart(weekStartDate);
+  const weekEnd = getWeekEnd(weekStartDate);
+  const weekEvents = events.filter((ev) => {
+    const t = new Date(ev.createdAt).getTime();
+    return t >= weekStart.getTime() && t <= weekEnd.getTime();
+  });
+
+  const expenditure = weekEvents.reduce((sum, ev) => sum + ev.price, 0);
+  const itemsAdded = weekEvents.reduce((sum, ev) => sum + ev.quantity, 0);
+  const avgPerItem = itemsAdded > 0 ? expenditure / itemsAdded : 0;
+
   const categoryStats = {};
-
-  filteredItems.forEach(item => {
-    const price = parseFloat(item.price) || 0;
-    const qty = parseInt(item.quantity) || 1;
-    
-    totalSpent += price;
-    totalItemsCount += qty;
-
-    // Category stats
-    const cat = item.category || "Other";
-    if (!categoryStats[cat]) {
-      categoryStats[cat] = { totalPrice: 0, totalQty: 0, count: 0 };
+  weekEvents.forEach((ev) => {
+    if (!categoryStats[ev.category]) {
+      categoryStats[ev.category] = { totalPrice: 0, totalQty: 0 };
     }
-    categoryStats[cat].totalPrice += price;
-    categoryStats[cat].totalQty += qty;
-    categoryStats[cat].count += 1;
+    categoryStats[ev.category].totalPrice += ev.price;
+    categoryStats[ev.category].totalQty += ev.quantity;
   });
 
-  // Update Top Metrics
-  if (insightTotal) insightTotal.textContent = `$${totalSpent.toFixed(2)}`;
-  if (insightItems) insightItems.textContent = `${totalItemsCount} items`;
-  
-  if (insightBudget) {
-    const remaining = budget - totalSpent;
-    insightBudget.textContent = `$${Math.max(0, remaining).toFixed(2)}`;
-  }
-
-  // Top Category
-  let topCategory = "None";
-  let maxValue = 0;
-  
-  Object.keys(categoryStats).forEach(cat => {
-    if (categoryStats[cat].totalPrice > maxValue) {
-      maxValue = categoryStats[cat].totalPrice;
-      topCategory = cat;
-    }
-  });
-
-  if (insightTopCategory) insightTopCategory.textContent = topCategory;
-
-  // Update Category Breakdown
-  updateCategoryBreakdown(categoryStats);
-} */
-
-// ====================== INSIGHTS PAGE - REAL DYNAMIC VALUES ======================
-/* const displayPrice = document.getElementById("displayPrice");
-  const displayQty = document.getElementById("displayQty");
-  const displayAvg = document.getElementById("displayAvg");
-  const displayTopCategory = document.getElementById("displayTopCategory");
-
-  displayPrice.innerHTML= totalSpent; */
-
-function updateInsightsPage() {
-  const filteredItems = getFilteredItems();
-
-  let totalSpent = 0;
-  let totalItemsCount = 0;
-  const categoryStats = {};
-
-  filteredItems.forEach((item) => {
-    const price = parseFloat(item.price) || 0;
-    const qty = parseInt(item.quantity) || 1;
-
-    totalSpent += price;
-    totalItemsCount += qty;
-
-    const cat = (item.category || "Other").trim();
-    if (!categoryStats[cat]) {
-      categoryStats[cat] = { totalPrice: 0, totalQty: 0 };
-    }
-    categoryStats[cat].totalPrice += price;
-    categoryStats[cat].totalQty += qty;
-  });
-
-  document.getElementById("overviewTotalSpent").textContent =
-    formatMoney(totalSpent);
-  document.getElementById("overviewTotalItems").textContent = totalItemsCount;
-
-  // Budget Used Percentage
-  const budgetUsedPercent =
-    budget > 0 ? Math.min(100, Math.round((totalSpent / budget) * 100)) : 0;
-  document.getElementById("overviewTotalBudget").textContent =
-    `${budgetUsedPercent}%`;
-
-  // Top Category
   let topCategory = "None";
   let maxSpent = 0;
   Object.keys(categoryStats).forEach((cat) => {
@@ -1042,199 +866,349 @@ function updateInsightsPage() {
       topCategory = cat;
     }
   });
-  document.getElementById("overviewTopCategory").textContent = topCategory;
+
+  return {
+    weekStart: weekStart.toISOString(),
+    weekEnd: weekEnd.toISOString(),
+    expenditure,
+    itemsAdded,
+    avgPerItem,
+    topCategory,
+    categoryStats,
+  };
+}
+
+// Backfills any fully-completed real calendar weeks that haven't been
+// saved yet. The current in-progress week is intentionally left out -
+// it only gets saved once it's actually over.
+function syncWeeklyContainers() {
+  const containers = loadWeeklyContainers();
+  const events = getAllTrackedEvents();
+  if (events.length === 0) return containers;
+
+  const currentWeekStart = getWeekStart(new Date());
+  const earliestTime = Math.min(...events.map((ev) => new Date(ev.createdAt).getTime()));
+  if (!isFinite(earliestTime)) return containers;
+
+  let cursor = getWeekStart(new Date(earliestTime));
+  let changed = false;
+  let guard = 0;
+
+  while (cursor.getTime() < currentWeekStart.getTime() && guard < 1000) {
+    const key = weekKey(cursor);
+    if (!containers[key]) {
+      containers[key] = computeWeekStats(cursor, events);
+      changed = true;
+    }
+    cursor = new Date(cursor.getTime() + 7 * MS_DAY);
+    guard++;
+  }
+
+  if (changed) saveWeeklyContainers(containers);
+  return containers;
+}
+
+function getLiveCurrentWeekStats() {
+  return computeWeekStats(new Date(), getAllTrackedEvents());
+}
+
+// Resolves a period+range selection down to the list of week containers
+// (saved, and the live current week when applicable) that make it up.
+function getWeeksForRange(period, range) {
+  const containers = syncWeeklyContainers();
+  const currentWeekStart = getWeekStart(new Date());
+  const savedWeeks = Object.keys(containers)
+    .sort()
+    .map((k) => containers[k]);
+  const liveWeek = getLiveCurrentWeekStats();
+
+  if (period === "week") {
+    if (range === "This week") return [liveWeek];
+
+    let count = 1;
+    if (range === "Last 2 weeks") count = 2;
+    else if (range === "Last 3 weeks") count = 3;
+
+    return savedWeeks.slice(-count);
+  }
+
+  // period === "month" - real calendar month boundaries decide which
+  // saved weeks (and the live week, if current) belong where.
+  const now = new Date();
+
+  if (range === "This month") {
+    const monthStart = getMonthStart(now);
+    const monthEnd = getMonthEnd(now);
+    const weeksInMonth = savedWeeks.filter((w) => {
+      const ws = new Date(w.weekStart).getTime();
+      return ws >= monthStart.getTime() && ws <= monthEnd.getTime();
+    });
+    if (
+      currentWeekStart.getTime() >= monthStart.getTime() &&
+      currentWeekStart.getTime() <= monthEnd.getTime()
+    ) {
+      weeksInMonth.push(liveWeek);
+    }
+    return weeksInMonth;
+  }
+
+  let monthsBack = 1;
+  if (range === "Last 2 months") monthsBack = 2;
+  else if (range === "Last 3 months") monthsBack = 3;
+
+  const rangeEndMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const rangeStartMonth = new Date(now.getFullYear(), now.getMonth() - monthsBack, 1);
+  const rangeStart = getMonthStart(rangeStartMonth);
+  const rangeEnd = getMonthEnd(rangeEndMonth);
+
+  return savedWeeks.filter((w) => {
+    const ws = new Date(w.weekStart).getTime();
+    return ws >= rangeStart.getTime() && ws <= rangeEnd.getTime();
+  });
+}
+
+// Sums a list of week containers into one summary.
+function aggregateWeeks(weeks) {
+  let expenditure = 0;
+  let itemsAdded = 0;
+  const categoryStats = {};
+
+  weeks.forEach((w) => {
+    expenditure += w.expenditure;
+    itemsAdded += w.itemsAdded;
+    Object.entries(w.categoryStats || {}).forEach(([cat, data]) => {
+      if (!categoryStats[cat]) categoryStats[cat] = { totalPrice: 0, totalQty: 0 };
+      categoryStats[cat].totalPrice += data.totalPrice;
+      categoryStats[cat].totalQty += data.totalQty;
+    });
+  });
+
+  const avgPerItem = itemsAdded > 0 ? expenditure / itemsAdded : 0;
+
+  let topCategory = "None";
+  let maxSpent = 0;
+  Object.keys(categoryStats).forEach((cat) => {
+    if (categoryStats[cat].totalPrice > maxSpent) {
+      maxSpent = categoryStats[cat].totalPrice;
+      topCategory = cat;
+    }
+  });
+
+  return { expenditure, itemsAdded, avgPerItem, topCategory, categoryStats };
+}
+
+function getRangeData(period, range) {
+  const weeks = getWeeksForRange(period, range);
+  return { ...aggregateWeeks(weeks), weeks };
+}
+
+// Real millisecond bounds covered by a period+range selection - used by
+// the chart and by getFilteredItems() for item-name-level granularity
+// that the per-week containers don't store.
+function getRangeBounds(period, range) {
+  const weeks = getWeeksForRange(period, range);
+  if (weeks.length === 0) {
+    const now = new Date();
+    return { start: getWeekStart(now).getTime(), end: now.getTime() };
+  }
+  const starts = weeks.map((w) => new Date(w.weekStart).getTime());
+  const ends = weeks.map((w) => new Date(w.weekEnd).getTime());
+  return { start: Math.min(...starts), end: Math.min(Math.max(...ends), Date.now()) };
+}
+
+// Kept for other callers (e.g. the budget card) that just need a flat
+// list of price/quantity-bearing records for the current period+range.
+function getFilteredItems() {
+  const { start, end } = getRangeBounds(currentPeriod, selectedRange);
+  return getAllTrackedEvents().filter((ev) => {
+    const t = new Date(ev.createdAt).getTime();
+    return t >= start && t <= end;
+  });
+}
+
+// ====================== WEEK / MONTH CONTAINER RENDERING ======================
+function formatShortDate(d) {
+  return new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function renderInsightWeekRow(week, isLive) {
+  const row = document.createElement("div");
+  row.className = "insight-week-row";
+  row.innerHTML = `
+    <div class="insight-week-range">
+      ${formatShortDate(week.weekStart)} – ${formatShortDate(week.weekEnd)}${isLive ? ' <span class="insight-live-tag">this week</span>' : ""}
+    </div>
+    <div class="insight-week-stats">
+      <span class="iw-stat"><strong>${formatMoney(week.expenditure)}</strong></span>
+      <span class="iw-stat">${week.itemsAdded} items</span>
+      <span class="iw-stat">${formatMoney(week.avgPerItem)} avg</span>
+      <span class="iw-stat">${week.topCategory}</span>
+    </div>
+  `;
+  return row;
+}
+
+function renderInsightGroups(period, weeks) {
+  const parent = document.querySelector(".insights-content");
+  if (!parent) return;
+
+  let groupsContainer = document.getElementById("insightGroupsContainer");
+  if (!groupsContainer) {
+    groupsContainer = document.createElement("div");
+    groupsContainer.id = "insightGroupsContainer";
+    groupsContainer.className = "insight-groups";
+    parent.appendChild(groupsContainer);
+  }
+  groupsContainer.innerHTML = "";
+
+  const currentKey = weekKey(new Date());
+
+  if (period === "week") {
+    const container = document.createElement("div");
+    container.className = "insight-week-container";
+
+    const header = document.createElement("h4");
+    header.className = "insight-group-header";
+    header.textContent = "Weekly Breakdown";
+    container.appendChild(header);
+
+    if (weeks.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "insight-empty";
+      empty.textContent = "No data yet for this range";
+      container.appendChild(empty);
+    } else {
+      [...weeks].reverse().forEach((w) => {
+        container.appendChild(renderInsightWeekRow(w, weekKey(w.weekStart) === currentKey));
+      });
+    }
+
+    groupsContainer.appendChild(container);
+    return;
+  }
+
+  // period === "month"
+  const container = document.createElement("div");
+  container.className = "insight-month-container";
+
+  const header = document.createElement("h4");
+  header.className = "insight-group-header";
+  header.textContent = "Monthly Breakdown";
+  container.appendChild(header);
+
+  if (weeks.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "insight-empty";
+    empty.textContent = "No data yet for this range";
+    container.appendChild(empty);
+    groupsContainer.appendChild(container);
+    return;
+  }
+
+  const byMonth = {};
+  weeks.forEach((w) => {
+    const d = new Date(w.weekStart);
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    if (!byMonth[key]) byMonth[key] = { year: d.getFullYear(), month: d.getMonth(), weeks: [] };
+    byMonth[key].weeks.push(w);
+  });
+
+  Object.values(byMonth)
+    .sort((a, b) => a.year - b.year || a.month - b.month)
+    .reverse()
+    .forEach((m) => {
+      const monthAgg = aggregateWeeks(m.weeks);
+      const monthBlock = document.createElement("div");
+      monthBlock.className = "insight-month-block";
+
+      const monthName = new Date(m.year, m.month).toLocaleString(undefined, {
+        month: "long",
+        year: "numeric",
+      });
+
+      const heading = document.createElement("div");
+      heading.className = "insight-month-heading";
+      heading.innerHTML = `<span>${monthName}</span><strong>${formatMoney(monthAgg.expenditure)}</strong>`;
+      monthBlock.appendChild(heading);
+
+      [...m.weeks].reverse().forEach((w) => {
+        monthBlock.appendChild(renderInsightWeekRow(w, weekKey(w.weekStart) === currentKey));
+      });
+
+      container.appendChild(monthBlock);
+    });
+
+  groupsContainer.appendChild(container);
+}
+
+// Updates the real (previously static/dead) category card on the
+// visible Insights page overview - shows the actual top category for
+// the currently selected period+range instead of a hardcoded example.
+function updateVisibleCategoryCard(categoryStats, totalSpent) {
+  const card = document.querySelector(".insights-content .overview-card .category-data");
+  if (!card) return;
+
+  const nameEl = card.querySelector(".cat-name");
+  const spendingEl = card.querySelector("#categorySpending");
+  const qtyEl = card.querySelector("#categoryNumOfItems");
+  const percentEl = card.querySelector("#categoryPercentage");
+  const fillEl = card.querySelector(".cat-bar-fill");
+
+  const entries = Object.entries(categoryStats || {});
+  if (entries.length === 0) {
+    if (nameEl) nameEl.textContent = "No data";
+    if (spendingEl) spendingEl.innerHTML = `<h4>${formatMoney(0)}</h4>`;
+    if (qtyEl) qtyEl.innerHTML = "<p>• 0 items</p>";
+    if (percentEl) percentEl.innerHTML = "<p>0%</p>";
+    if (fillEl) fillEl.style.width = "0%";
+    return;
+  }
+
+  const [topName, topData] = entries.sort((a, b) => b[1].totalPrice - a[1].totalPrice)[0];
+  const percentage = totalSpent > 0 ? (topData.totalPrice / totalSpent) * 100 : 0;
+
+  if (nameEl) nameEl.textContent = topName;
+  if (spendingEl) spendingEl.innerHTML = `<h4>${formatMoney(topData.totalPrice)}</h4>`;
+  if (qtyEl) qtyEl.innerHTML = `<p>• ${topData.totalQty} items</p>`;
+  if (percentEl) percentEl.innerHTML = `<p>${percentage.toFixed(0)}%</p>`;
+  if (fillEl) fillEl.style.width = `${percentage}%`;
+}
+
+// ====================== INSIGHTS PAGE - REAL CALENDAR DATA ======================
+function updateInsightsPage() {
+  const rangeData = getRangeData(currentPeriod, selectedRange);
+  const { expenditure, itemsAdded, avgPerItem, topCategory, categoryStats, weeks } = rangeData;
+
+  const overviewTotalSpent = document.getElementById("overviewTotalSpent");
+  const overviewTotalItems = document.getElementById("overviewTotalItems");
+  const overviewTotalBudget = document.getElementById("overviewTotalBudget");
+  const overviewTopCategory = document.getElementById("overviewTopCategory");
+
+  if (overviewTotalSpent) overviewTotalSpent.textContent = `${formatMoney(expenditure)}`;
+  if (overviewTotalItems) overviewTotalItems.textContent = itemsAdded;
+
+  const budgetUsedPercent =
+    budget > 0 ? Math.min(100, Math.round((expenditure / budget) * 100)) : 0;
+  if (overviewTotalBudget) overviewTotalBudget.textContent = `${budgetUsedPercent}%`;
+  if (overviewTopCategory) overviewTopCategory.textContent = topCategory;
 
   const displayPrice = document.getElementById("displayPrice");
   const displayQty = document.getElementById("displayQty");
   const displayAvg = document.getElementById("displayAvg");
   const displayTopCategory = document.getElementById("displayTopCategory");
 
-  displayPrice.innerHTML = formatMoney(totalSpent);
-  displayQty.innerHTML = totalItemsCount;
-  displayAvg.innerHTML = formatMoney(
-    totalItemsCount > 0 ? totalSpent / totalItemsCount : 0,
-  );
-  displayTopCategory.innerHTML = topCategory;
+  if (displayPrice) displayPrice.textContent = `${formatMoney(expenditure)}`;
+  if (displayQty) displayQty.textContent = itemsAdded;
+  if (displayAvg) displayAvg.textContent = `${formatMoney(avgPerItem)}`;
+  if (displayTopCategory) displayTopCategory.textContent = topCategory;
 
-  // Render weekly groups (and month-groups when period is month)
-  try {
-    const groupsContainerId = "insightGroupsContainer";
-    let groupsContainer = document.getElementById(groupsContainerId);
-    const parent = document.querySelector(".insights-content");
-    if (!groupsContainer && parent) {
-      groupsContainer = document.createElement("div");
-      groupsContainer.id = groupsContainerId;
-      groupsContainer.className = "insight-groups";
-      parent.appendChild(groupsContainer);
-    }
-
-    if (groupsContainer) {
-      groupsContainer.innerHTML = "";
-      const startTime = getRangeStart(currentPeriod, selectedRange);
-      const endTime = getRangeEnd();
-      const weekGroups = groupItemsByWeeks(filteredItems, startTime, endTime).reverse();
-
-      const header = document.createElement("h4");
-      header.textContent = currentPeriod === "month" ? "Monthly / Weekly Breakdown" : "Weekly Breakdown";
-      header.style.margin = "12px 0 8px";
-      groupsContainer.appendChild(header);
-
-      if (currentPeriod === "month") {
-        const months = groupWeeksByMonth(weekGroups);
-        months.forEach((m) => {
-          const mdiv = document.createElement("div");
-          mdiv.className = "month-group";
-          const monthName = new Date(m.year, m.month).toLocaleString(undefined, { month: "long", year: "numeric" });
-          mdiv.innerHTML = `<div class="month-header">${monthName} — <strong>${formatMoney(m.total)}</strong></div>`;
-          m.weeks.forEach((w) => {
-            const wdiv = document.createElement("div");
-            wdiv.className = "week-row";
-            wdiv.innerHTML = `${w.weekStart.toLocaleDateString()} - ${w.weekEnd.toLocaleDateString()} : <strong>${formatMoney(w.total)}</strong> (${w.items.length} items)`;
-            mdiv.appendChild(wdiv);
-          });
-          groupsContainer.appendChild(mdiv);
-        });
-      } else {
-        weekGroups.forEach((w) => {
-          const wdiv = document.createElement("div");
-          wdiv.className = "week-row";
-          wdiv.innerHTML = `${w.weekStart.toLocaleDateString()} - ${w.weekEnd.toLocaleDateString()} : <strong>${formatMoney(w.total)}</strong> (${w.items.length} items)`;
-          groupsContainer.appendChild(wdiv);
-        });
-      }
-    }
-  } catch (e) {
-    console.warn("Failed to render insight groups", e);
-  }
-
-  // Update Category Breakdown
-  updateCategoryBreakdown(categoryStats, totalSpent);
+  renderInsightGroups(currentPeriod, weeks);
+  updateVisibleCategoryCard(categoryStats, expenditure);
+  updateInsightsCategoryBreakdown(categoryStats, expenditure);
 }
-
-// Category Breakdown
-/* function updateCategoryBreakdown(categoryStats, totalOverallSpent) {
-  const container = document.getElementById("categoryBreakdownContainer");
-  if (!container) return;
-  container.innerHTML = "";
-
-  const statsArray = Object.entries(categoryStats).map(([name, data]) => ({
-    name,
-    totalPrice: data.totalPrice,
-    totalQty: data.totalQty
-  }));
-
-  const topByPrice = [...statsArray]
-    .sort((a, b) => b.totalPrice - a.totalPrice)
-    .slice(0, 3);
-
-  if (topByPrice.length > 0) {
-    const header = document.createElement("h4");
-    header.textContent = "Top Spending Categories";
-    header.style.margin = "12px 0 8px";
-    container.appendChild(header);
-
-    topByPrice.forEach(cat => {
-      const percentage = totalOverallSpent > 0 ? (cat.totalPrice / totalOverallSpent) * 100 : 0;
-      const div = document.createElement("div");
-      div.className = "category-breakdown-item";
-      div.innerHTML = `
-        <div class="category-name">${cat.name}</div>
-        <div class="category-stats">
-          <span>Qty: ${cat.totalQty}</span>
-          <span>$${cat.totalPrice.toFixed(2)}</span>
-        </div>
-        <div class="category-bar-container">
-          <div class="category-bar-fill" style="width: ${percentage}%"></div>
-        </div>
-        <span class="percentage">${percentage.toFixed(0)}%</span>
-      `;
-      container.appendChild(div);
-    });
-  }
-
-  if (statsArray.length === 0) {
-    container.innerHTML = `<p style="text-align:center;color:#999;padding:30px 0;">No items in current range</p>`;
-  }
-}
-
-// Helper for Category Breakdown (Top by Price & Quantity)
-function updateCategoryBreakdown(categoryStats) {
-  const container = document.getElementById("categoryBreakdownContainer");
-  if (!container) return;
-
-  container.innerHTML = "";
-
-  // Convert to array and sort
-  const statsArray = Object.entries(categoryStats).map(([name, data]) => ({
-    name,
-    totalPrice: data.totalPrice,
-    totalQty: data.totalQty,
-    count: data.count
-  }));
-
-  // Top 3 by Expense
-  const topByPrice = [...statsArray]
-    .sort((a, b) => b.totalPrice - a.totalPrice)
-    .slice(0, 3);
-
-  // Top 3 by Quantity
-  const topByQty = [...statsArray]
-    .sort((a, b) => b.totalQty - a.totalQty)
-    .slice(0, 3);
-
-  const totalOverall = statsArray.reduce((sum, cat) => sum + cat.totalPrice, 0);
-
-  // Create Breakdown Cards
-  const createBreakdownCard = (cat, type) => {
-    const percentage = totalOverall > 0 ? (cat.totalPrice / totalOverall) * 100 : 0;
-    
-    const div = document.createElement("div");
-    div.className = "category-breakdown-item";
-    div.innerHTML = `
-      <div class="category-name">${cat.name}</div>
-      <div class="category-stats">
-        <span class="qty">Qty: ${cat.totalQty}</span>
-        <span class="price">$${cat.totalPrice.toFixed(2)}</span>
-      </div>
-      <div class="category-bar-container">
-        <div class="category-bar-fill" style="width: ${percentage}%"></div>
-      </div>
-      <span class="percentage">${percentage.toFixed(0)}%</span>
-    `;
-    return div;
-  };
-
-  // Add Top by Price
-  if (topByPrice.length > 0) {
-    const priceHeader = document.createElement("h4");
-    priceHeader.textContent = "Top by Spending";
-    priceHeader.style.margin = "16px 0 8px";
-    container.appendChild(priceHeader);
-
-    topByPrice.forEach(cat => {
-      container.appendChild(createBreakdownCard(cat, "price"));
-    });
-  }
-
-  // Add Top by Quantity
-  if (topByQty.length > 0) {
-    const qtyHeader = document.createElement("h4");
-    qtyHeader.textContent = "Top by Quantity";
-    qtyHeader.style.margin = "16px 0 8px";
-    container.appendChild(qtyHeader);
-
-    topByQty.forEach(cat => {
-      container.appendChild(createBreakdownCard(cat, "qty"));
-    });
-  }
-
-  if (statsArray.length === 0) {
-    container.innerHTML = `<p style="text-align:center; color:#999; padding:20px;">No data in current range</p>`;
-  }
-} */
 
 // ====================== CATEGORY BREAKDOWN - REAL VALUES ======================
-function updateCategoryBreakdown(categoryStats, totalOverallSpent) {
+function updateInsightsCategoryBreakdown(categoryStats, totalOverallSpent) {
   const container = document.getElementById("categoryBreakdownContainer");
   if (!container) return;
   container.innerHTML = "";
